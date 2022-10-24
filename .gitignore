@@ -1,0 +1,26 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+
+# Default ignored files
+/shelf/
+/workspace.xml
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+
+
+# Pycharm files
+.idea/
+.ipynb_checkpoints/
+.idea
+.ipynb_checkpoints
+
+
+# Path --> git rm --cached mylogfile.log
+MzProject/paths.py
+
+/Workbooks
