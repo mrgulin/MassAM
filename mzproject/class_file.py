@@ -1,4 +1,3 @@
-import mzproject.wrapper as w
 import numpy as np
 import matplotlib.pyplot as plt
 import mzproject.dependencies as dep
@@ -152,13 +151,12 @@ class SplitFeatureDataClass:
 
 
 class MzProject:
-    @w.function_details
-    def __init__(self, mode="Negative"):
+    def __init__(self):
+        logger.log(20, f"Initializing object for feature table generation.")
         # this is with pytheomics
         # https://gitlab.isas.de/lifs-public/lipidxplorer/-/
         # blob/af7e8f280c145763426e6a04f7ca26cc9c073e05/notebooks/0.1-jm-MS_reader.ipynb
         self.filename = []
-        self.mode = mode
         self.peaks = dict()
         self.mergedMS2scans = []  # Type: list
         self.scans = None
@@ -171,7 +169,6 @@ class MzProject:
         self.aligned_dict: typing.Dict[str, typing.Union[np.array, list, dict]] = {
             "h": [], "A": [], "peak_data": [], "delta_time": [], "delta_mz": [], "peak_length": [], "M05": [], "M1": [],
             "M15": [], "M2": []}
-        self.starting_parameters_str = ""
         self.dict_plot_index = dict()
         self.header = None  # This is header of peak_data array
         self.matched_list = []  # List reserved for matching with suspect_list
@@ -180,18 +177,19 @@ class MzProject:
 
     def __call__(self, *args, **kwargs):
         end = self.write_parameters()
-        return self.starting_parameters_str + w.function_call + end
+        return "This is object that is used to generate aligned feature table. This object is using next files:\n" \
+               f"{', '.join(self.filename)}" + end
 
-    @w.function_details
     def write_parameters(self):
+        logger.log(20, f"Exporting parameters")
         log_string = "\nParameters:\n"
         for key, value in self.parameters.items():
             log_string += f"\t\t\t{key} = {value}\n"
         log_string += "\n"
         return log_string
 
-    @w.function_details
     def set_parameter(self, name, value):
+        logger.log(20, f"Setting parameter'{name}' from {self.parameters[name]}  to {value}.")
         self.parameters[name] = value
 
     def __str__(self):
@@ -201,7 +199,6 @@ class MzProject:
         return "mzproject object"
 
     # region opening_modules
-    @w.function_details
     def add_files(self, filename_list: list, mz_tr_tuple: tuple = (), limit_mass=tuple()):
         """
         This method takes filename_list and generates scans dataframe, peaks dictionary, filename list, ...
@@ -288,7 +285,6 @@ class MzProject:
             logger.log(40, "|| " + str1)
         logger.log(18, "|| files read")
 
-    @w.function_details
     def add_files_speed(self, filename_list: list, mz_tr_tuple: tuple = (), limit_mass=tuple()):
         """
         This method takes filename_list and generates scans dataframe, peaks dictionary, filename list, ...
@@ -297,6 +293,8 @@ class MzProject:
         :param filename_list: list of strings (e.g. output from f.get_files)
         :param limit_mass: (min_mz, max_mz); if left there is no limit
         """
+        logger.log(20, f"Adding files with add_files_speed; filename_list={filename_list}, mz_tr_tuple]{mz_tr_tuple},"
+                       f" limit_mass={limit_mass}")
         old_filename = []
         if self.filename:
             old_filename = self.filename
@@ -381,7 +379,6 @@ class MzProject:
             logger.log(40, "|| " + str1)
         logger.log(18, "|| files read")
 
-    @w.function_details
     def add_aligned_dict(self, source_folder: str, root_name: str, extension_list=tuple(), sep: str = ",",
                          common_columns: int = 10):
         """
@@ -394,7 +391,9 @@ class MzProject:
         :param sep: separator in tables
         :param common_columns: columns that belong to peak_data
         """
-        logger.log(20, f"| starting to read aligned dict")
+        logger.log(20, f"Importing aligned dict witw add_aligned_dict: source_folder={source_folder},"
+                       f" root_name={root_name}, table_types={extension_list}, sep='{sep}',"
+                       f" common columns={common_columns}")
         self.header = None  # to reset old header if it has been there
         old_filename = []
         if self.filename:
@@ -463,7 +462,6 @@ class MzProject:
     # endregion
 
     # region table modules
-    @w.function_details
     def generate_table(self, save_graph: bool = True, limit_iteration: int = 0, graph_path_folder: str = "graphs/",
                        row_comment=(), force: bool = False):
         """
@@ -475,7 +473,8 @@ class MzProject:
         :param graph_path_folder: Something like "graphs/" it is relative to output_path
         :param row_comment: This gets into comments in aligned list and also in legend in graphs
         """
-        logger.log(20, f"| Starting to generate a table")
+        logger.log(20, f"| Starting to generate a table with generate_table: save_graph={save_graph},"
+                       f" limit_iteration={limit_iteration}, force={force}")
         self.header = ["index", "mz", "tr", "scans", "noise", "too_far", "noise_ratio1",
                        "noise_ratio2", "comment", "M_plus_1"]
 
@@ -925,12 +924,10 @@ class MzProject:
             self.aligned_dict[names_list[j]][i][reverse_name_dict[filename1]] = value_list[j]
 
     # Other methods ###################################
-    @w.function_details
     def check_for_formulas(self, mass_list, adduct_difference=-dep.m_p, mz_tolerance=0.01,
                            time_tolerance=1) -> np.array:
         """
         based on given mass_list and adduct_difference algorithm tries to match every mass to aligned list feature(s).
-        :param self: mzproject
         :param mass_list: list of type [[id1, mz1, tr1], [id2, mz2, tr2], ...]. Same as file list that is input for
         merged_msms_from_table
         :param adduct_difference: difference from masses in list to mz. e.g. for M-H, difference is -1.007... if masses
@@ -961,7 +958,6 @@ class MzProject:
 
         return arr2
 
-    @w.function_details
     def match_features(self, file_name_absolute, mz_tolerance=0.03, encoding1="UTF-8-sig"):
         """
         Finds similar masses from suspect list and self.aligned_dict. It saves matched table to self.matched_list
@@ -997,7 +993,6 @@ class MzProject:
         self.matched_list = match_list
         return match_list
 
-    @w.function_details
     def calculate_mean(self, suffix_length=7, dtype=float):
         """
         Algorithm averages sample parallels from aligned dict. If there are 3 samples than at least 2 must have non 0
@@ -1041,7 +1036,6 @@ class MzProject:
                     self.averaged_aligned_dict[table_name][i][k] = mean
                     k += 1
 
-    @w.function_details
     def merge_duplicate_rows(self, reindex=False):
         """
         Some files get duplicated because peaks are too long for merge_features to recognize it as one peak.
@@ -1115,7 +1109,6 @@ class MzProject:
                        f" {len(temp_aligned_dict['peak_data'])}")
         self.aligned_dict = temp_aligned_dict
 
-    @w.function_details
     def calculate_suspect_list_scores(self, output_name="/matched_file.csv", show_plot=False, save_plot=False):
         """
         Method calculates similarity between in silico spectra of suspect list and measured spectra and exports table to
@@ -1180,7 +1173,6 @@ class MzProject:
 
     # region export_modules
 
-    @w.function_details
     def save_spectrum_picture(self, index, fragments_list, max_diff_abs=0.05):
         scan_index_string = self.aligned_dict["peak_data"]["scans"][self.aligned_dict["peak_data"]["index"] == index][0]
         mz = self.aligned_dict["peak_data"]["mz"][self.aligned_dict["peak_data"]["index"] == index][0]
@@ -1235,7 +1227,6 @@ class MzProject:
             conn.write(f"{line[0]}\t{line[1]}\n")
         conn.close()
 
-    @w.function_details
     def export_filtered_ms(self, index_list: list, exp_filename="sirius_1", split_on=50,
                            min_h=0, mode="non-averaged") -> None:
         """
@@ -1317,7 +1308,6 @@ class MzProject:
             conn.write(export_string)
         logger.log(20, f"|| MS spectra are exported! in {dep.output_path + exp_filename}***-***.ms")
 
-    @w.function_details
     def average_spectrum(self, feature_id, energy_level, grouping_threshold=0.1):
         # Getting line
         line = self.aligned_dict["peak_data"][feature_id]
@@ -1367,7 +1357,6 @@ class MzProject:
         # exp_spectrum[:, 1] = exp_spectrum[:, 1] * 100 / max(exp_spectrum[:, 1])
         return exp_spectrum
 
-    @w.function_details
     def export_mgf(self, index_list: list, exp_filename="mgf_1", split_on=1000, min_h=0, mode="A") -> None:
         """
         Based on aligned data, files and list of indexes it exports in ms file that can be imported by sirius.
@@ -1463,7 +1452,6 @@ class MzProject:
             conn.write(export_string)
         logger.log(20, f"|| MS spectra are exported! in {dep.output_path + exp_filename}***-***.mgf")
 
-    @w.function_details
     def extract_sim(self, mz_list: list or float, filename: list or float,
                     mz_tolerance: float = 0.1, retention_time_range: tuple = (), show_graph: str = "",
                     comment: str = "", save_graph: str = "", rewrite_colors: dict = None) -> tuple:
@@ -1538,7 +1526,6 @@ class MzProject:
         plt.close(fig_tic)
         return time_list, intensity_list
 
-    @w.function_details
     def export_tables(self, file_name: str, additional_data_array=(), namelist=()):
         """
         Saves tables in dep.output_path/common name_typeOfTable.csv. First columns are common and then there is table
@@ -1573,7 +1560,6 @@ class MzProject:
                                            self.aligned_dict[i]), axis=1), delimiter=',', fmt='%s',
                            header=header, comments='')
 
-    @w.function_details
     def export_tables_averaged(self, file_name):
         """
         For exporting averaged_aligned_dict. It uses peak_data from aligned dict!
@@ -1590,7 +1576,6 @@ class MzProject:
                                        self.averaged_aligned_dict[i]), axis=1), delimiter=',', fmt='%s',
                        header=header, comments='')
 
-    @w.function_details
     def get_ms2_spectrum(self, filename: str, key1: str, show_graph: bool = True, save_plot: str = "",
                          title: str = "test_specter", most_intense: int = -1, min_h: int = -1, round_mz: bool = False):
         """
@@ -1631,7 +1616,6 @@ class MzProject:
     # endregion3
     # region msms_finding_modules
 
-    @w.function_details
     def filter_constant_ions(self, show_graph: bool = False, save_graph: typing.Union[bool, str] = "",
                              save_deleted: str = "deleted_masses.txt", abs_path: bool = False) -> np.array:
         """
@@ -1690,7 +1674,6 @@ class MzProject:
         logger.log(18, f"|| Discarded {len(df_not_keep.index)} MS2 spectra and kept {len(df_keep.index)}")
         return deleted
 
-    @w.function_details
     def merge_features(self):
         """
         Groups MS2 spectra that have similar tr and similar mz. Output gets saved in self.mergedMS2scans.
@@ -1749,7 +1732,6 @@ class MzProject:
                      "filename"]
         return np.array(df3[col_names])
 
-    @w.function_details
     def merged_msms_from_table(self, input_array: list, dtr: float = 0.5, dmz: float = 0.03):
         """
         It takes input_array and tries to find MS2 scans that are close enough. Calculation are saved in 
