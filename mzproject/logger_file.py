@@ -1,6 +1,5 @@
 import logging
 
-# region logging settings
 # This is used instead of prints. By setting handler level (between 1 and 50) you can adjust number of messages
 # depending on the importance
 formatter = logging.Formatter('%(levelname)8s %(lineno)4s %(asctime)s: %(message)s', "%Y-%m-%d %H:%M:%S")

@@ -17,13 +17,6 @@ import warnings
 from dataclasses import dataclass, field
 import mzproject.logger_file
 
-logger = mzproject.logger_file.general_logger
-mzproject.logger_file.logging.captureWarnings(True)
-
-
-def set_logging_levels(stream_level, file_level):
-    mzproject.logger_file.stream_handler.setLevel(stream_level)
-    mzproject.logger_file.general_handler.setLevel(file_level)
 
 
 m_p = 1.00727647  # Da, g/mol, amu
@@ -151,8 +144,13 @@ class SplitFeatureDataClass:
 
 
 class MzProject:
-    def __init__(self):
-        logger.log(20, f"Initializing object for feature table generation.")
+    def __init__(self, stream_level=25, file_level=20):
+        self.logger = mzproject.logger_file.general_logger  # Generate logger for the class
+        mzproject.logger_file.logging.captureWarnings(True)
+        mzproject.logger_file.stream_handler.setLevel(stream_level)
+        mzproject.logger_file.general_handler.setLevel(file_level)
+
+        self.logger.log(20, f"Initializing object for feature table generation.")
         # this is with pytheomics
         # https://gitlab.isas.de/lifs-public/lipidxplorer/-/
         # blob/af7e8f280c145763426e6a04f7ca26cc9c073e05/notebooks/0.1-jm-MS_reader.ipynb
@@ -181,7 +179,7 @@ class MzProject:
                f"{', '.join(self.filename)}" + end
 
     def write_parameters(self):
-        logger.log(20, f"Exporting parameters")
+        self.logger.log(20, f"Exporting parameters")
         log_string = "\nParameters:\n"
         for key, value in self.parameters.items():
             log_string += f"\t\t\t{key} = {value}\n"
@@ -189,7 +187,7 @@ class MzProject:
         return log_string
 
     def set_parameter(self, name, value):
-        logger.log(20, f"Setting parameter'{name}' from {self.parameters[name]}  to {value}.")
+        self.logger.log(20, f"Setting parameter'{name}' from {self.parameters[name]}  to {value}.")
         self.parameters[name] = value
 
     def __str__(self):
@@ -212,14 +210,14 @@ class MzProject:
             old_filename = self.filename
             self.filename = []
         first = True
-        logger.log(20, f'| Starting to add {len(filename_list)} files')
+        self.logger.log(20, f'| Starting to add {len(filename_list)} files')
         # It reads data trough mzxml.read and it transforms it into dataframe
         file_counter = 0
         for filename in filename_list:  # TODO: parallelize
             self.filename.append(filename)
             scans = []
             self.peaks[filename] = dict()
-            logger.log(18, "|| Reading ", dep.input_path + filename, f" ({file_counter}/{len(filename_list)})")
+            self.logger.log(18, "|| Reading ", dep.input_path + filename, f" ({file_counter}/{len(filename_list)})")
             file_counter += 1
             with mzxml.read(dep.input_path + filename) as reader:
 
@@ -282,8 +280,8 @@ class MzProject:
         if old_filename and old_filename != self.filename:
             str1 = "Problem! Files that are read are not same as those that were in imported aligned_dict!"
             str1 += f"files from aligned_dict: {old_filename}\n imported files: {self.filename}"
-            logger.log(40, "|| " + str1)
-        logger.log(18, "|| files read")
+            self.logger.log(40, "|| " + str1)
+        self.logger.log(18, "|| files read")
 
     def add_files_speed(self, filename_list: list, mz_tr_tuple: tuple = (), limit_mass=tuple()):
         """
@@ -293,7 +291,7 @@ class MzProject:
         :param filename_list: list of strings (e.g. output from f.get_files)
         :param limit_mass: (min_mz, max_mz); if left there is no limit
         """
-        logger.log(20, f"Adding files with add_files_speed; filename_list={filename_list}, mz_tr_tuple]{mz_tr_tuple},"
+        self.logger.log(20, f"Adding files with add_files_speed; filename_list={filename_list}, mz_tr_tuple]{mz_tr_tuple},"
                        f" limit_mass={limit_mass}")
         old_filename = []
         if self.filename:
@@ -302,12 +300,12 @@ class MzProject:
         first = True
         # It reads data trough mzxml.read and it transforms it into dataframe
         file_counter = 0
-        logger.log(20, f'| Starting to add {len(filename_list)} files with FAST algorithm')
+        self.logger.log(20, f'| Starting to add {len(filename_list)} files with FAST algorithm')
         for filename in filename_list:  # TODO: parallelize
             self.filename.append(filename)
             scans = []
             self.peaks[filename] = dict()
-            logger.log(18, f"|| Reading {dep.input_path + filename} ({file_counter}/{len(filename_list)})")
+            self.logger.log(18, f"|| Reading {dep.input_path + filename} ({file_counter}/{len(filename_list)})")
             file_counter += 1
             with open(dep.input_path + filename, "rb") as xml:
                 xml_as_bytes = xml.read()
@@ -376,8 +374,8 @@ class MzProject:
         if old_filename and old_filename != self.filename:
             str1 = "Problem! Files that are read are not same as those that were in imported aligned_dict!"
             str1 += f"files from aligned_dict: {old_filename}\n imported files: {self.filename}"
-            logger.log(40, "|| " + str1)
-        logger.log(18, "|| files read")
+            self.logger.log(40, "|| " + str1)
+        self.logger.log(18, "|| files read")
 
     def add_aligned_dict(self, source_folder: str, root_name: str, extension_list=tuple(), sep: str = ",",
                          common_columns: int = 10):
@@ -391,7 +389,7 @@ class MzProject:
         :param sep: separator in tables
         :param common_columns: columns that belong to peak_data
         """
-        logger.log(20, f"Importing aligned dict witw add_aligned_dict: source_folder={source_folder},"
+        self.logger.log(20, f"Importing aligned dict witw add_aligned_dict: source_folder={source_folder},"
                        f" root_name={root_name}, table_types={extension_list}, sep='{sep}',"
                        f" common columns={common_columns}")
         self.header = None  # to reset old header if it has been there
@@ -418,7 +416,7 @@ class MzProject:
 
         # aligned_dict
         for extension in extension_list:
-            logger.log(16, f"|| Reading file {source_folder}/{root_name}-{extension}.csv")
+            self.logger.log(16, f"|| Reading file {source_folder}/{root_name}-{extension}.csv")
             conn = open(f"{source_folder}/{root_name}-{extension}.csv")
             lines = conn.readlines()
             conn.close()
@@ -430,7 +428,7 @@ class MzProject:
             self.aligned_dict[extension] = np.array(temp_aligned_list, dtype=float)
 
             if not ((header == self.header) or (self.header is None)):
-                logger.log(40, f"|| Problem: Header do not match \nheader 1: {self.header}\nheader 2: {header}")
+                self.logger.log(40, f"|| Problem: Header do not match \nheader 1: {self.header}\nheader 2: {header}")
             self.header = header
             # For peak_data
             if extension_list[0] == extension:
@@ -455,9 +453,9 @@ class MzProject:
         if old_filename and new_filename != old_filename:
             str1 = "|| Files that are read are not same as those that were in imported raw files!"
             str1 += f"files from aligned_dict: {old_filename}\n imported files: {new_filename}"
-            logger.log(40, str1)
+            self.logger.log(40, str1)
         self.filename = new_filename
-        logger.log(16, f"Finished reading table: header={self.header}, filename={self.filename}")
+        self.logger.log(16, f"Finished reading table: header={self.header}, filename={self.filename}")
 
     # endregion
 
@@ -473,7 +471,7 @@ class MzProject:
         :param graph_path_folder: Something like "graphs/" it is relative to output_path
         :param row_comment: This gets into comments in aligned list and also in legend in graphs
         """
-        logger.log(20, f"| Starting to generate a table with generate_table: save_graph={save_graph},"
+        self.logger.log(20, f"| Starting to generate a table with generate_table: save_graph={save_graph},"
                        f" limit_iteration={limit_iteration}, force={force}")
         self.header = ["index", "mz", "tr", "scans", "noise", "too_far", "noise_ratio1",
                        "noise_ratio2", "comment", "M_plus_1"]
@@ -496,7 +494,7 @@ class MzProject:
         for main_group_index, mass_feature in enumerate(self.mergedMS2scans):
             # mass_feature is list of different MS2 spectra from different files that all have similar tr and mz.
             # This means that maybe some of the groups have to be additionally split
-            logger.log(16, f"|| starting new group with {len(mass_feature)} spectra with index {main_group_index}")
+            self.logger.log(16, f"|| starting new group with {len(mass_feature)} spectra with index {main_group_index}")
             split_peak_group_obj = self.align_peak_with_ms(mass_feature)
 
             for subpeak_index in range(split_peak_group_obj.feature_num):
@@ -513,7 +511,7 @@ class MzProject:
                 str1 += f"feature_number={aligned_table_index}{('/' + str(limit_iteration)) * (limit_iteration > 0)}, "
                 str1 += f"self.mergedMS2scans index = {main_group_index}/{len(self.mergedMS2scans)},"
                 str1 += f" subpeak_index = {subpeak_index}"
-                logger.log(18, str1)
+                self.logger.log(18, str1)
 
                 self.dict_plot_index[aligned_table_index] = (main_group_index, subpeak_index)
 
@@ -569,7 +567,7 @@ class MzProject:
 
         if best_feature[1] > self.parameters["peak_split_interval_diff"] or best_feature_2[1] > \
                 self.parameters["peak_split_max_h_diff"]:
-            logger.log(20, f"|||| Splitting feature: {round(best_feature[1], 5)} "
+            self.logger.log(20, f"|||| Splitting feature: {round(best_feature[1], 5)} "
                            f"{self.parameters['peak_split_interval_diff']} {round(best_feature_2[1], 5)}"
                            f" {self.parameters['peak_split_max_h_diff']}")
             # Features are not the same so I need to create new one
@@ -702,7 +700,7 @@ class MzProject:
         split_peak_group_obj = self.align_peak_with_ms(mass_feature)
         self.align_peak_without_ms(split_peak_group_obj, index_tuple[1], '', -1, dict(), False)
 
-        logger.log(20, f'| Plotting feature with index tuple {index_tuple}: '
+        self.logger.log(20, f'| Plotting feature with index tuple {index_tuple}: '
                        f'mz={split_peak_group_obj.med_mz[-1]:.4f}, tr={split_peak_group_obj.med_tr[-1]:.2f}')
 
         plot_names = [key[0] for key, value in split_peak_group_obj.raw_data.items() if
@@ -784,7 +782,7 @@ class MzProject:
         :return: [(avg_mz, avg_mz_s), (t_start, t_max, t_end), (peak_h, peak_area), avg_mz_list, time_list,
          intensity_list, comment (or at least place for comment)]
         """
-        logger.log(14, f'|||| find_peak for mz={mz}, tr={r_time}, file="{curr_file}")')
+        self.logger.log(14, f'|||| find_peak for mz={mz}, tr={r_time}, file="{curr_file}")')
         suitable_df = self.scans[
             (min(r_time) - self.parameters["time_interval"] < self.scans["retentionTime"]) & (
                     self.scans["retentionTime"] < max(r_time) + self.parameters["time_interval"])
@@ -890,7 +888,7 @@ class MzProject:
                     ax1.fill_between(time_list_c, y_c, 0, alpha=0.3)
                     ax2.plot(time_list_c, avg_mz_list_c, "g-")
                     fig.show()
-                    logger.log(14, f"Peak data: original m/z: {mz}, original time: {r_time}"
+                    self.logger.log(14, f"Peak data: original m/z: {mz}, original time: {r_time}"
                                    f"actual times: {tr}, h={ret.peak_h}, area={ret.peak_area},"
                                    f" mz={ret.avg_mz}+-{ret.avg_mz_s}")
 
@@ -948,7 +946,7 @@ class MzProject:
                         table1[j][3].append((self.aligned_dict["peak_data"]["index"][i], mz - table1[j][1],
                                              self.aligned_dict["peak_data"]["tr"][i]))
         for i in range(len(table1)):
-            logger.log(20, f"{table1[i][0]}, M{adduct_difference:+.0f}={table1[i][1]:.3f}: {table1[i][3]}")
+            self.logger.log(20, f"{table1[i][0]}, M{adduct_difference:+.0f}={table1[i][1]:.3f}: {table1[i][3]}")
 
         arr2 = np.empty([len(self.aligned_dict["A"]), 2], dtype='<U40')
         for i in table1:
@@ -1017,7 +1015,7 @@ class MzProject:
                 group_dict[cut_curr_name].append(i)
             else:
                 group_dict[cut_curr_name] = [i]
-        logger.log(20, f"| Calculate mean: group dict={group_dict}")
+        self.logger.log(20, f"| Calculate mean: group dict={group_dict}")
         for gr_name in group_dict.keys():
             self.header_averaged.append(gr_name)
         for table_name in [i for i in list(self.aligned_dict.keys()) if i != "peak_data"]:
@@ -1048,7 +1046,7 @@ class MzProject:
         """
         merged_id_list: typing.List[typing.List[int]] = []
         pd_list: typing.Union[typing.Dict, np.ndarray] = self.aligned_dict["peak_data"]
-        logger.log(20, '| Starting to merge duplicated rows')
+        self.logger.log(20, '| Starting to merge duplicated rows')
         for new_id in range(len(pd_list)):
             # General approach is that for each index we check if there are already features that are similar
             if len(merged_id_list) == 0:  # Only the first iteration
@@ -1061,7 +1059,7 @@ class MzProject:
                 mz_tol = self.parameters["duplicates_mz_tolerance"]
                 delta_tr = abs(float(pd_list[new_id][2]) - float(pd_list[check_id][2]))
                 if (delta_mz < mz_tol) and (delta_tr < self.parameters["duplicates_tr_tolerance"]):
-                    logger.log(18, f'|| Features with indices {check_id} and {new_id} are equivalent')
+                    self.logger.log(18, f'|| Features with indices {check_id} and {new_id} are equivalent')
                     merged_id_list[group_id].append(new_id)
                     # This means that current feature is duplicated and can be merged
                     break
@@ -1105,7 +1103,7 @@ class MzProject:
         m_string = [max([len(j[i]) for j in aligned_list_2]) for i in ['scans', 'noise', 'too_far', 'comment']]
         dtype = dep.get_dtype(m_string)
         temp_aligned_dict["peak_data"] = np.array(aligned_list_2, dtype=dtype)
-        logger.log(18, f"|| Finished merging duplicated rows. From {len(self.aligned_dict['peak_data'])} rows to"
+        self.logger.log(18, f"|| Finished merging duplicated rows. From {len(self.aligned_dict['peak_data'])} rows to"
                        f" {len(temp_aligned_dict['peak_data'])}")
         self.aligned_dict = temp_aligned_dict
 
@@ -1164,7 +1162,7 @@ class MzProject:
                 self.matched_list[i][8] = dot
             for line in self.matched_list:
                 exp_str += ",".join([str(i) for i in line]) + "\n"
-        logger.log(20, f"| writing matched suspect list in {dep.output_path + output_name}")
+        self.logger.log(20, f"| writing matched suspect list in {dep.output_path + output_name}")
         conn = open(dep.output_path + output_name, "w", encoding="UTF-8")
         conn.write(exp_str)
         conn.close()
@@ -1248,9 +1246,9 @@ class MzProject:
         order_list = order_list[order_list[:, 0].argsort()]
         order_list = order_list[:, 1].argsort()
         filtered_list = filtered_list[order_list]
-        logger.log(20, f"| Starting to export .ms files")
+        self.logger.log(20, f"| Starting to export .ms files")
         if len(filtered_list) == 0:
-            logger.log(30, f"|| Indexes do not match!! aligned_dict indexes: {list(peak_data[0])[:5]},"
+            self.logger.log(30, f"|| Indexes do not match!! aligned_dict indexes: {list(peak_data[0])[:5]},"
                            f" input indexes: {index_list[:5]}")
         for line in filtered_list:
             line = list(line)
@@ -1298,7 +1296,7 @@ class MzProject:
                 name = dep.output_path + exp_filename + "_" + str(k + 1 - split_on) + "-" + str(k + 1) + ".ms"
                 with open(name, "w", encoding="UTF-8") as conn:
                     conn.write(export_string)
-                logger.log(18, "|| Wrote: ", exp_filename + str(k + 1 - split_on) + "-" + str(k + 1) + ".ms")
+                self.logger.log(18, "|| Wrote: ", exp_filename + str(k + 1 - split_on) + "-" + str(k + 1) + ".ms")
 
                 export_string = ""
             k += 1
@@ -1306,7 +1304,7 @@ class MzProject:
         with open(dep.output_path + exp_filename + f"_{(k + 1) // split_on * split_on}-end.ms", "w",
                   encoding="UTF-8") as conn:
             conn.write(export_string)
-        logger.log(20, f"|| MS spectra are exported! in {dep.output_path + exp_filename}***-***.ms")
+        self.logger.log(20, f"|| MS spectra are exported! in {dep.output_path + exp_filename}***-***.ms")
 
     def average_spectrum(self, feature_id, energy_level, grouping_threshold=0.1):
         # Getting line
@@ -1369,7 +1367,7 @@ class MzProject:
         :param mode: A: non merged, non averaged; B: merged non averaged; C: merged, averaged in energies;
         D: merged, averaged all
         """
-        logger.log(20, "| Starting to export mgf")
+        self.logger.log(20, "| Starting to export mgf")
         export_string = ""
         k = 0
         peak_data = self.aligned_dict["peak_data"]
@@ -1383,7 +1381,7 @@ class MzProject:
         order_list = order_list[:, 1].argsort()
         filtered_list = filtered_list[order_list]
         if len(filtered_list) == 0:
-            logger.log(30, f"|| Indexes do not match!! aligned_dict indexes: {list(peak_data[0])[:5]},"
+            self.logger.log(30, f"|| Indexes do not match!! aligned_dict indexes: {list(peak_data[0])[:5]},"
                            f" input indexes: {index_list[:5]}")
         for line in filtered_list:
             scan_index_list = [[i, i.split("__")[0]] for i in line[3].split("|") if i.count("__") == 1]
@@ -1414,7 +1412,7 @@ class MzProject:
                                 export_string += "{:.5f} {:.1f} \n".format(i[0], i[1])
                     export_string += "END IONS\n"
             elif mode == "B":
-                logger.log(40, "|| To be written!")
+                self.logger.log(40, "|| To be written!")
             elif mode == "C":
                 energy_levels = [i for i in list(set(self.scans.tempenergy)) if not np.isnan(i)]
                 for level in energy_levels:
@@ -1442,7 +1440,7 @@ class MzProject:
                 name = dep.output_path + exp_filename + "_" + str(k + 1 - split_on) + "-" + str(k + 1) + ".mgf"
                 with open(name, "w", encoding="UTF-8") as conn:
                     conn.write(export_string)
-                logger.log(18, f"|| Wrote: {exp_filename + str(k + 1 - split_on)}{str(k + 1)}.mgf")
+                self.logger.log(18, f"|| Wrote: {exp_filename + str(k + 1 - split_on)}{str(k + 1)}.mgf")
 
                 export_string = ""
             k += 1
@@ -1450,7 +1448,7 @@ class MzProject:
         with open(dep.output_path + exp_filename + f"_{(k + 1) // 50 * 50}-end.mgf", "w",
                   encoding="UTF-8") as conn:
             conn.write(export_string)
-        logger.log(20, f"|| MS spectra are exported! in {dep.output_path + exp_filename}***-***.mgf")
+        self.logger.log(20, f"|| MS spectra are exported! in {dep.output_path + exp_filename}***-***.mgf")
 
     def extract_sim(self, mz_list: list or float, filename: list or float,
                     mz_tolerance: float = 0.1, retention_time_range: tuple = (), show_graph: str = "",
@@ -1516,7 +1514,7 @@ class MzProject:
             ax_tic.grid(True)
             ax_tic.set_xlim(limits[0], limits[1])
             if save_graph:
-                logger.log(18, f'|| Saving plot in {dep.output_path}{save_graph}_'
+                self.logger.log(18, f'|| Saving plot in {dep.output_path}{save_graph}_'
                                f'tr={retention_time_range}_{comment}.svg')
                 fig_tic.savefig(
                     dep.output_path + f'{save_graph}_tr={retention_time_range}_{comment}.svg',
@@ -1537,7 +1535,7 @@ class MzProject:
         :param additional_data_array: Only if additional data: dimensions n(mass_features) x m
         """
         header = ",".join(self.header + list(namelist) + self.filename)
-        logger.log(20, f"| Starting to export tables in {dep.output_path}")
+        self.logger.log(20, f"| Starting to export tables in {dep.output_path}")
         # self.dict_plot_index:
         path1 = f"{dep.output_path}/{file_name}-index_dict.csv"
         conn = open(path1, "w", encoding="UTF-8")
@@ -1546,7 +1544,7 @@ class MzProject:
         conn.close()
 
         for i in [i for i in list(self.aligned_dict.keys()) if i != "peak_data"]:
-            logger.log(18, f"|| Saving table {i} with additional {len(additional_data_array)} columns.")
+            self.logger.log(18, f"|| Saving table {i} with additional {len(additional_data_array)} columns.")
             if len(additional_data_array) != 0:
                 # noinspection PyTypeChecker
                 np.savetxt(dep.output_path + "/" + file_name + f"-{i}.csv",
@@ -1567,9 +1565,9 @@ class MzProject:
         :param file_name: common file name for tables relative to dep.output_path
         """
         header = ",".join(self.header + self.header_averaged)
-        logger.log(20, f"| Saving averaged aligned dict to: {dep.output_path + file_name}...")
+        self.logger.log(20, f"| Saving averaged aligned dict to: {dep.output_path + file_name}...")
         for i in [i for i in list(self.averaged_aligned_dict.keys()) if i != "peak_data"]:
-            logger.log(18, f"|| Saving table: {dep.output_path + file_name}-{i}.csv")
+            self.logger.log(18, f"|| Saving table: {dep.output_path + file_name}-{i}.csv")
             # noinspection PyTypeChecker
             np.savetxt(dep.output_path + file_name + f"-{i}.csv",
                        np.concatenate((self.aligned_dict["peak_data"].tolist(),
@@ -1629,7 +1627,7 @@ class MzProject:
         :return np.array of unique duplicated masses
         """
         min_len_peaks_per_file = len(self.filename) * self.parameters["min_len_peaks_per_file"]
-        logger.log(20, f"| Starting to filter recurring masses; minimal number of MS2 spectra ="
+        self.logger.log(20, f"| Starting to filter recurring masses; minimal number of MS2 spectra ="
                        f" {min_len_peaks_per_file} ({self.parameters['min_len_peaks_per_file']} per file).")
         self.scans2.sort_values(by=['precursorMz'], inplace=True)
         self.scans2.loc[:, "keep"] = True
@@ -1671,7 +1669,7 @@ class MzProject:
             with open(str(dep.output_path * (not abs_path)) + save_deleted, "w", encoding="UTF-8") as conn:
                 conn.write(
                     "\n".join(("{:.6f}".format(i) for i in deleted)))
-        logger.log(18, f"|| Discarded {len(df_not_keep.index)} MS2 spectra and kept {len(df_keep.index)}")
+        self.logger.log(18, f"|| Discarded {len(df_not_keep.index)} MS2 spectra and kept {len(df_keep.index)}")
         return deleted
 
     def merge_features(self):
@@ -1684,7 +1682,7 @@ class MzProject:
         # to filter out constantly present masses I need to get them:
         deleted_precursor_mz_list = self.scans2[~self.scans2["keep"]]['precursorMz']
         deleted_precursor_mz_list = np.array(deleted_precursor_mz_list.unique())
-        logger.log(20, '| Starting to merge MS2 spectra to get groups.')
+        self.logger.log(20, '| Starting to merge MS2 spectra to get groups.')
         col_names = ['num', 'retentionTime', 'basePeakMz', 'tempenergy', 'precursorMz', "precursorIntensity",
                      "filename"]
         array = self.scans2[self.scans2["keep"]][col_names].to_records(False)
@@ -1719,9 +1717,9 @@ class MzProject:
                         break
                 else:
                     pass
-                    logger.log(40, f"|| I FORGET WHAT IS THIS didn't find in deleted: {i[0]}")
+                    self.logger.log(40, f"|| I FORGET WHAT IS THIS didn't find in deleted: {i[0]}")
         self.mergedMS2scans = new_merged_list
-        logger.log(18, f"|| Merged all MSMS spectra in {len(new_merged_list)} features")
+        self.logger.log(18, f"|| Merged all MSMS spectra in {len(new_merged_list)} features")
 
     def find_scans(self, mz, tr, dtr=0.1, dmz=0.03):  # returns mergedMS2scans[i] alike structure
         df2 = self.scans[not np.isnan(self.scans.precursorMz)]
@@ -1765,7 +1763,7 @@ class MzProject:
         if len(ret_list) == 0:
             return -1
         ret_list = sorted(ret_list, key=lambda l: l[3], reverse=False)
-        logger.log(20, f"| with mz={mz} and tr={tr} we obtain first 2 indices: {ret_list[:2]}")
+        self.logger.log(20, f"| with mz={mz} and tr={tr} we obtain first 2 indices: {ret_list[:2]}")
         return ret_list[0][0]
 
     def plot_by_index(self, index, exp_file_name="picture", ha="h"):
@@ -1896,7 +1894,7 @@ def find_peak_function(y, threshold, descending_threshold=0.95):
                 # this first minimum or we are ascending or it is the smallest minimum
                 previous_minimum = row
     peak_list.append([peak_start, (previous_minimum[1], previous_minimum[2])])
-    logger.log(10, f'||||| Obtained peak list: {peak_list}')
+    self.logger.log(10, f'||||| Obtained peak list: {peak_list}')
     return peak_list
 
 
