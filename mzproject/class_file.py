@@ -17,8 +17,6 @@ import warnings
 from dataclasses import dataclass, field
 import mzproject.logger_file
 
-
-
 m_p = 1.00727647  # Da, g/mol, amu
 np.seterr(all='raise')
 parameters = {
@@ -262,8 +260,8 @@ class MzProject:
                         m = [-1]
 
                     self.peaks[filename][peak_dict_name] = np.array([m, i]).transpose()
-                scans_df = pd.DataFrame(scans, columns=['index', 'num', 'msLevel', 'peaksCount', 'retentionTime', 
-                                                        'lowMz', 'highMz', 'basePeakMz', 'basePeakIntensity', 
+                scans_df = pd.DataFrame(scans, columns=['index', 'num', 'msLevel', 'peaksCount', 'retentionTime',
+                                                        'lowMz', 'highMz', 'basePeakMz', 'basePeakIntensity',
                                                         'totIonCurrent', 'tempenergy', 'activationMethod',
                                                         'precursorScanNum', 'precursorMz', 'precursorIntensity'])
                 scans_df.set_index('index', inplace=True)
@@ -291,8 +289,9 @@ class MzProject:
         :param filename_list: list of strings (e.g. output from f.get_files)
         :param limit_mass: (min_mz, max_mz); if left there is no limit
         """
-        self.logger.log(20, f"Adding files with add_files_speed; filename_list={filename_list}, mz_tr_tuple]{mz_tr_tuple},"
-                       f" limit_mass={limit_mass}")
+        self.logger.log(20,
+                        f"Adding files with add_files_speed; filename_list={filename_list}, mz_tr_tuple]{mz_tr_tuple},"
+                        f" limit_mass={limit_mass}")
         old_filename = []
         if self.filename:
             old_filename = self.filename
@@ -389,9 +388,9 @@ class MzProject:
         :param sep: separator in tables
         :param common_columns: columns that belong to peak_data
         """
-        self.logger.log(20, f"Importing aligned dict witw add_aligned_dict: source_folder={source_folder},"
-                       f" root_name={root_name}, table_types={extension_list}, sep='{sep}',"
-                       f" common columns={common_columns}")
+        self.logger.log(20, f"Importing aligned dict with add_aligned_dict: source_folder={source_folder},"
+                            f" root_name={root_name}, table_types={extension_list}, sep='{sep}',"
+                            f" common columns={common_columns}")
         self.header = None  # to reset old header if it has been there
         old_filename = []
         if self.filename:
@@ -472,7 +471,7 @@ class MzProject:
         :param row_comment: This gets into comments in aligned list and also in legend in graphs
         """
         self.logger.log(20, f"| Starting to generate a table with generate_table: save_graph={save_graph},"
-                       f" limit_iteration={limit_iteration}, force={force}")
+                            f" limit_iteration={limit_iteration}, force={force}")
         self.header = ["index", "mz", "tr", "scans", "noise", "too_far", "noise_ratio1",
                        "noise_ratio2", "comment", "M_plus_1"]
 
@@ -568,8 +567,8 @@ class MzProject:
         if best_feature[1] > self.parameters["peak_split_interval_diff"] or best_feature_2[1] > \
                 self.parameters["peak_split_max_h_diff"]:
             self.logger.log(20, f"|||| Splitting feature: {round(best_feature[1], 5)} "
-                           f"{self.parameters['peak_split_interval_diff']} {round(best_feature_2[1], 5)}"
-                           f" {self.parameters['peak_split_max_h_diff']}")
+                                f"{self.parameters['peak_split_interval_diff']} {round(best_feature_2[1], 5)}"
+                                f" {self.parameters['peak_split_max_h_diff']}")
             # Features are not the same so I need to create new one
             list_retention_time_split.append(time_interval)
             key = len(list_retention_time_split) - 1
@@ -701,7 +700,7 @@ class MzProject:
         self.align_peak_without_ms(split_peak_group_obj, index_tuple[1], '', -1, dict(), False)
 
         self.logger.log(20, f'| Plotting feature with index tuple {index_tuple}: '
-                       f'mz={split_peak_group_obj.med_mz[-1]:.4f}, tr={split_peak_group_obj.med_tr[-1]:.2f}')
+                            f'mz={split_peak_group_obj.med_mz[-1]:.4f}, tr={split_peak_group_obj.med_tr[-1]:.2f}')
 
         plot_names = [key[0] for key, value in split_peak_group_obj.raw_data.items() if
                       key[1] == subpeak_index]
@@ -889,8 +888,8 @@ class MzProject:
                     ax2.plot(time_list_c, avg_mz_list_c, "g-")
                     fig.show()
                     self.logger.log(14, f"Peak data: original m/z: {mz}, original time: {r_time}"
-                                   f"actual times: {tr}, h={ret.peak_h}, area={ret.peak_area},"
-                                   f" mz={ret.avg_mz}+-{ret.avg_mz_s}")
+                                        f"actual times: {tr}, h={ret.peak_h}, area={ret.peak_area},"
+                                        f" mz={ret.avg_mz}+-{ret.avg_mz_s}")
 
                 ret.comment = str(round(noise_quotient, 3))
                 ret.comment += "_Noise" * int(noise_quotient < self.parameters["fp2_noise"])
@@ -1104,7 +1103,7 @@ class MzProject:
         dtype = dep.get_dtype(m_string)
         temp_aligned_dict["peak_data"] = np.array(aligned_list_2, dtype=dtype)
         self.logger.log(18, f"|| Finished merging duplicated rows. From {len(self.aligned_dict['peak_data'])} rows to"
-                       f" {len(temp_aligned_dict['peak_data'])}")
+                            f" {len(temp_aligned_dict['peak_data'])}")
         self.aligned_dict = temp_aligned_dict
 
     def calculate_suspect_list_scores(self, output_name="/matched_file.csv", show_plot=False, save_plot=False):
@@ -1249,7 +1248,7 @@ class MzProject:
         self.logger.log(20, f"| Starting to export .ms files")
         if len(filtered_list) == 0:
             self.logger.log(30, f"|| Indexes do not match!! aligned_dict indexes: {list(peak_data[0])[:5]},"
-                           f" input indexes: {index_list[:5]}")
+                                f" input indexes: {index_list[:5]}")
         for line in filtered_list:
             line = list(line)
             # line[3] = line[3].decode("latin1")
@@ -1382,7 +1381,7 @@ class MzProject:
         filtered_list = filtered_list[order_list]
         if len(filtered_list) == 0:
             self.logger.log(30, f"|| Indexes do not match!! aligned_dict indexes: {list(peak_data[0])[:5]},"
-                           f" input indexes: {index_list[:5]}")
+                                f" input indexes: {index_list[:5]}")
         for line in filtered_list:
             scan_index_list = [[i, i.split("__")[0]] for i in line[3].split("|") if i.count("__") == 1]
             line = list(line)
@@ -1515,7 +1514,7 @@ class MzProject:
             ax_tic.set_xlim(limits[0], limits[1])
             if save_graph:
                 self.logger.log(18, f'|| Saving plot in {dep.output_path}{save_graph}_'
-                               f'tr={retention_time_range}_{comment}.svg')
+                                    f'tr={retention_time_range}_{comment}.svg')
                 fig_tic.savefig(
                     dep.output_path + f'{save_graph}_tr={retention_time_range}_{comment}.svg',
                     dpi=70)
@@ -1628,7 +1627,7 @@ class MzProject:
         """
         min_len_peaks_per_file = len(self.filename) * self.parameters["min_len_peaks_per_file"]
         self.logger.log(20, f"| Starting to filter recurring masses; minimal number of MS2 spectra ="
-                       f" {min_len_peaks_per_file} ({self.parameters['min_len_peaks_per_file']} per file).")
+                            f" {min_len_peaks_per_file} ({self.parameters['min_len_peaks_per_file']} per file).")
         self.scans2.sort_values(by=['precursorMz'], inplace=True)
         self.scans2.loc[:, "keep"] = True
         mz1 = 0
