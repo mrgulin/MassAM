@@ -8,28 +8,29 @@ from datetime import datetime
 import mzproject.functions as f
 import mzproject.paths as paths
 from subprocess import Popen, CREATE_NEW_CONSOLE
+from typing import Union
 
 types = [("d_tr", np.float64), ("d_mz", np.float64), ("n_MSMS", int), ("n", int), ("h", np.float64)]
 
 
-def get_files_QC_features():
+def get_files_qc_features():
     f_list_neg = mzproject.functions.get_files()
     f_list_pos = mzproject.functions.get_files(paths.input_path_pos)
     f_list_pos = [i for i in f_list_pos if ("QC_MIX" in i) or ("Blank_EtOH" in i)]
 
-    types_QC = [("name", "<U20"), ("mz", np.float64), ("tr", np.float64), ("adduct", "<U20"), ("mode", "<U5"),
+    types_qc = [("name", "<U20"), ("mz", np.float64), ("tr", np.float64), ("adduct", "<U20"), ("mode", "<U5"),
                 ("mz_ion", np.float64)]
-    QC_features = f.read_simple_file_list(paths.IJS_ofline_path + "QC/QC_compounds_final.csv", header=False,
+    qc_features = f.read_simple_file_list(paths.IJS_ofline_path + "QC/QC_compounds_final.csv", header=False,
                                           encoding="UTF-8-sig")
-    QC_features = np.array([tuple(i) for i in QC_features], dtype=types_QC)
+    qc_features = np.array([tuple(i) for i in qc_features], dtype=types_qc)
 
-    for compound in QC_features:
+    for compound in qc_features:
         compound["mz_ion"] = compound["mz"] + {**dep.delta_mass_neg_adducts, **dep.delta_mass_pos_adducts}[
             compound["adduct"]]
-    return QC_features, f_list_neg, f_list_pos
+    return qc_features, f_list_neg, f_list_pos
 
 
-def _compare_table_with_qc(peak_data_table, rel_path, python, h_table, A_table, mzproject_obj, QC_features, comment,
+def _compare_table_with_qc(peak_data_table, rel_path, python, h_table, A_table, mzproject_obj, qc_features, comment,
                            polarity, ratio_mz_tr, reduce_file, file_group_list, filenames, save_peak_graphs=False):
     output_dict = dict()
     name_dict = dict()
@@ -49,7 +50,7 @@ def _compare_table_with_qc(peak_data_table, rel_path, python, h_table, A_table, 
     # output np.array
     out_string = f"{comment}\n{polarity} mode\n"
 
-    for compound in QC_features:
+    for compound in qc_features:
         output_line = np.array([0], dtype=types)
 
         if not ((compound['mode'] == "+" and polarity == "pos") or (compound['mode'] == "-" and polarity == "neg")):
@@ -147,9 +148,9 @@ def _compare_table_with_qc(peak_data_table, rel_path, python, h_table, A_table, 
 
 
 def run_one_experiment(file_list, name="test1", polarity="neg", input_path=None, subdirectory="test",
-                       change_dict=tuple(), QC_features=tuple(), from_table=False, comment="", compare_with_qc=False,
-                       file_group_list=("MIX2", "MIX1", "Blank"), save_peak_graphs=True, limit_mz=tuple(),
-                       ratio_mz_tr=50):
+                       change_dict=tuple(), qc_features: Union[tuple, np.array] = tuple(),
+                       from_table=False, comment="", compare_with_qc=False, file_group_list=("MIX2", "MIX1", "Blank"),
+                       save_peak_graphs=True, limit_mz=tuple(), ratio_mz_tr=50):
     # Measuring time at start
     start_time = time.perf_counter()
     current_time = datetime.now().strftime("%H:%M:%S")
@@ -162,14 +163,12 @@ def run_one_experiment(file_list, name="test1", polarity="neg", input_path=None,
         os.mkdir(dep.IJS_ofline_path + f"/{subdirectory}/{name}")
     dep.change_output(dep.IJS_ofline_path + f"/{subdirectory}/{name}/")
     obj = mzproject.class_file.MzProject()
+
     for key, value in change_dict:
         obj.parameters[key] = value
 
+    obj.add_files_speed(file_list, limit_mass=limit_mz)
     if not from_table:
-        if len(limit_mz) == 2:
-            obj.add_files_speed(file_list, limit_mass=limit_mz)
-        else:
-            obj.add_files_speed(file_list)
         obj.filter_constant_ions(save_graph="deleted_masses.png")
         obj.merge_features()
         obj.generate_table(save_graph=False, force=True, )
@@ -178,11 +177,6 @@ def run_one_experiment(file_list, name="test1", polarity="neg", input_path=None,
         obj.export_tables("table")
         obj.export_tables_averaged("table_averaged")
     else:
-        if save_peak_graphs:
-            if len(limit_mz) == 2:
-                obj.add_files_speed(file_list, limit_mass=limit_mz)
-            else:
-                obj.add_files_speed(file_list)
         obj.add_aligned_dict(dep.IJS_ofline_path + f"/{subdirectory}/{name}/", "table")
 
     # Measuring end time:
@@ -193,20 +187,19 @@ def run_one_experiment(file_list, name="test1", polarity="neg", input_path=None,
     print(string1)
     if not from_table:
         # Writing methods and parameters to file
-        conn = open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/report.txt", "w", encoding="UTF-8")
-        conn.write(obj() + "\n\n\n" + string1)
-        conn.close()
+        with open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/report.txt", "w", encoding="UTF-8") as conn:
+            conn.write(obj() + "\n\n\n" + string1)
 
     # Saving additional data
     out1 = [name, polarity, comment, file_list, file_group_list]
     with open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/Experiment_info.txt", "w", encoding="UTF-8") as conn:
         conn.write(repr(out1))
-    if not compare_with_qc:
-        return 0
-    if len(QC_features) > 0:
+    if compare_with_qc:
+        if len(qc_features) == 0:
+            print("There is no QC features!")
         _compare_table_with_qc(peak_data_table=obj.aligned_dict["peak_data"], rel_path=f"{subdirectory}/{name}",
                                h_table=obj.aligned_dict["h"], A_table=obj.aligned_dict["A"], python=True,
-                               mzproject_obj=obj, QC_features=QC_features, comment=comment, polarity=polarity,
+                               mzproject_obj=obj, qc_features=qc_features, comment=comment, polarity=polarity,
                                ratio_mz_tr=ratio_mz_tr, reduce_file=False, file_group_list=file_group_list,
                                filenames=obj.filename, save_peak_graphs=save_peak_graphs)
 
@@ -233,7 +226,7 @@ def get_MSMS_number(path_to_file, reduce_file=True):
     return id_dict
 
 
-def run_one_experiment_mzmine(name, subdirectory, file_list, file_group_list, QC_features, polarity="neg", comment="",
+def run_one_experiment_mzmine(name, subdirectory, file_list, file_group_list, qc_features, polarity="neg", comment="",
                               protocol="MSMS_peaklist_builder", change_dict=None, calculate_table=True,
                               reduce_file=True, save_project="", ratio_mz_tr=50):
     if change_dict is None:
@@ -308,18 +301,18 @@ def run_one_experiment_mzmine(name, subdirectory, file_list, file_group_list, QC
     table = np.array(table)
     columns = columns.strip().split(",")[:-1]
 
-    if len(QC_features) > 0:
+    if len(qc_features) > 0:
         h_table = table[:, 3:]
         temp_table = table[:, :3]
         peak_data_table = np.array([tuple(i) for i in temp_table],
                                    dtype=[('index', '<i4'), ('mz', '<f8'), ('tr', '<f8')])
         _compare_table_with_qc(peak_data_table=peak_data_table, rel_path=f"{subdirectory}/{name}",
                                h_table=h_table, A_table=np.zeros(h_table.shape), python=False, mzproject_obj=None,
-                               QC_features=QC_features, comment=comment, polarity=polarity, ratio_mz_tr=ratio_mz_tr,
+                               qc_features=qc_features, comment=comment, polarity=polarity, ratio_mz_tr=ratio_mz_tr,
                                reduce_file=reduce_file, file_group_list=file_group_list, filenames=columns[3:])
 
 
-def generate_3D_table(file_list, QC_features):
+def generate_3D_table(file_list, qc_features):
     """
 
     :param file_list: [(relative path to folder from offline_path, ...]
@@ -408,7 +401,7 @@ def generate_3D_table(file_list, QC_features):
                                   ("avg_MSMS", np.float64), ("min_MSMS", int), ("max_MSMS", int), ("avg_n", np.float64),
                                   ("avg_h", np.float64)])
 
-    compound_table = np.vstack((QC_features[QC_features["mode"] == "-"]["name"],
+    compound_table = np.vstack((qc_features[qc_features["mode"] == "-"]["name"],
                                 np.nanmean(main_table["d_tr"] ** 2, axis=0) ** 0.5,
                                 np.nanmax(abs(main_table["d_tr"]), axis=0),
                                 np.nanmean(main_table["d_mz"] ** 2, axis=0) ** 0.5,
@@ -436,12 +429,12 @@ def generate_3D_table(file_list, QC_features):
 
 if __name__ == "__main__":
     np.seterr(all='raise')
-    QC_features, f_list_neg, f_list_pos = get_files_QC_features()
+    qc_features1, f_list_neg1, f_list_pos1 = get_files_qc_features()
 
-    run_one_experiment(f_list_neg[:6], 'test_python', 'neg', subdirectory='test_python', QC_features=QC_features,
+    run_one_experiment(f_list_neg1[:6], 'test_python', 'neg', subdirectory='test_python', qc_features=qc_features1,
                        compare_with_qc=True, limit_mz=(200, 250), )
-    # run_one_experiment_mzmine('mzmine_test', 'test_python', [i for i in f_list_neg if "QC_MIX" in i],
-    #                           ['MIX1', "MIX2"], QC_features)
+    # run_one_experiment_mzmine('mzmine_test', 'test_python', [i for i in f_list_neg1 if "QC_MIX" in i],
+    #                           ['MIX1', "MIX2"], qc_features1)
 
     # table_of_paths = ["Experiment/neg/EtOH_QC", "Experiment/neg/Beer_QC", "Experiment/neg/WW_QC",
     #                   "Experiment/neg/EtOH_QC_MIX1", "Experiment/neg/EtOH_QC_MIX1_random",
@@ -451,6 +444,6 @@ if __name__ == "__main__":
 
     # table_of_paths = os.listdir(paths.IJS_ofline_path + "/Experiment/neg3/")
     # table_of_paths = ["Experiment/neg3/" + i for i in table_of_paths]
-    # tup = generate_3D_table(table_of_paths, QC_features)
+    # tup = generate_3D_table(table_of_paths, qc_features)
     # print(tup[2])
     # # MIX1 + Blank  || MIX2 + MIX1 + Blank + random samples
