@@ -678,7 +678,7 @@ class MzProject:
         split_peak_group_obj.med_tr.append(med_tr)
 
     def plot_from_index(self, index, index_tuple=(), save_graph=False, graph_path_folder: str = "graphs2/",
-                        show_plot=True):
+                        show_plot=True, save_name_with_tuple_index=True):
         warnings.warn('THIS HAS TO BE UPDATED!!')
         if not self.mergedMS2scans:
             self.filter_constant_ions(save_deleted="")
@@ -705,10 +705,16 @@ class MzProject:
                       key[1] == index_tuple[1]]
         plot_data = [value for key, value in split_peak_group_obj.raw_data.items() if
                      key[1] == index_tuple[1]]
+        start_comment = str(index_tuple)
+        if not save_name_with_tuple_index:
+            if index == -1:
+                raise ValueError("You shouldn't use save_name_with_tuple_index = False if you plot with help of "
+                                 "the tuple")
+            start_comment = str(index)
         plot_graph(plot_data, plot_names, dep.output_path + graph_path_folder,
                    f"mz={split_peak_group_obj.med_mz[-1]:.4f}_tr={split_peak_group_obj.med_tr[-1]:.2f}",
                    split_peak_group_obj=split_peak_group_obj, subpeak_index=index_tuple[1],
-                   start_comment=str(index_tuple) + "_", save_graph=save_graph, show_plot=show_plot)
+                   start_comment=start_comment + "_", save_graph=save_graph, show_plot=show_plot)
 
     def calculate_isotopic_ratio(self, tr, mz, current_file, show_graph=False):
         intensity_dict: typing.Dict[float, typing.List[float]] = dict()  # Dictionary for writing all intensity trends
