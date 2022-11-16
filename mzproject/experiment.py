@@ -189,6 +189,10 @@ def run_one_experiment(file_list, name="test1", polarity="neg", input_path=None,
         # Writing methods and parameters to file
         with open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/report.txt", "w", encoding="UTF-8") as conn:
             conn.write(obj() + "\n\n\n" + string1)
+        with open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/filenames.txt", "w", encoding="UTF-8") as conn:
+            conn.write(repr(obj.filename))
+        with open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/parameters.txt", "w", encoding="UTF-8") as conn:
+            conn.write(repr(obj.parameters))
 
     # Saving additional data
     out1 = [name, polarity, comment, file_list, file_group_list]
@@ -322,10 +326,10 @@ def generate_3D_table(file_list, qc_features):
     support_data = []
     # file list is relative to out_path!!!
     for filename in file_list:
-        conn = open(dep.IJS_ofline_path + f"/{filename}/Experiment_info.txt", "r", encoding="UTF-8")
-        temp1 = eval(conn.read())
-        group_list = temp1[4]
-        conn.close()
+        with open(dep.IJS_ofline_path + f"/{filename}/Experiment_info.txt", "r", encoding="UTF-8") as conn:
+            temp1 = eval(conn.read())
+            group_list = temp1[4]
+
         for group_name in group_list:
             main_table.append(np.loadtxt(dep.IJS_ofline_path + f"/{filename}/Experiment_results_{group_name}.txt",
                                          dtype=types))
@@ -431,8 +435,8 @@ if __name__ == "__main__":
     np.seterr(all='raise')
     qc_features1, f_list_neg1, f_list_pos1 = get_files_qc_features()
 
-    run_one_experiment(f_list_neg1[:6], 'test_python', 'neg', subdirectory='test_python', qc_features=qc_features1,
-                       compare_with_qc=True, limit_mz=(200, 250), )
+    run_one_experiment([i for i in f_list_neg1 if "QC_MIX" in i], 'test_python', 'neg', subdirectory='test_python',
+                       qc_features=qc_features1, compare_with_qc=True, limit_mz=(200, 250), )
     # run_one_experiment_mzmine('mzmine_test', 'test_python', [i for i in f_list_neg1 if "QC_MIX" in i],
     #                           ['MIX1', "MIX2"], qc_features1)
 
