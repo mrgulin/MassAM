@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import mzproject.dependencies as dep
-import mzproject.cfmcaller as cfm
 import pandas as pd
 from pyteomics import mzxml
 import os
@@ -703,9 +702,9 @@ class MzProject:
                             f'mz={split_peak_group_obj.med_mz[-1]:.4f}, tr={split_peak_group_obj.med_tr[-1]:.2f}')
 
         plot_names = [key[0] for key, value in split_peak_group_obj.raw_data.items() if
-                      key[1] == subpeak_index]
+                      key[1] == index_tuple[1]]
         plot_data = [value for key, value in split_peak_group_obj.raw_data.items() if
-                     key[1] == subpeak_index]
+                     key[1] == index_tuple[1]]
         plot_graph(plot_data, plot_names, dep.output_path + graph_path_folder,
                    f"mz={split_peak_group_obj.med_mz[-1]:.4f}_tr={split_peak_group_obj.med_tr[-1]:.2f}",
                    split_peak_group_obj=split_peak_group_obj, subpeak_index=index_tuple[1],
@@ -1105,67 +1104,6 @@ class MzProject:
         self.logger.log(18, f"|| Finished merging duplicated rows. From {len(self.aligned_dict['peak_data'])} rows to"
                             f" {len(temp_aligned_dict['peak_data'])}")
         self.aligned_dict = temp_aligned_dict
-
-    def calculate_suspect_list_scores(self, output_name="/matched_file.csv", show_plot=False, save_plot=False):
-        """
-        Method calculates similarity between in silico spectra of suspect list and measured spectra and exports table to
-        table with output_name
-        In order to run this method we have to previously run add_files, add_aligned__dict, match_features
-        :param self: reference to mzproject object
-        :param output_name: relative (to dep.output_path) path to table with scores
-        :param show_plot: if True every feature will plot a graph
-        :param save_plot: if True every feature will save a graph in /suspect_ms/ folder
-        :return: None
-        """
-        exp_str = ""
-        for i in range(len(self.matched_list)):
-            specter = cfm.get_insilico(self.matched_list[i][0], self.matched_list[i][5], "se-")
-            if 'se--energy2' in specter:  # energies are 10, 20 ,40
-                in_silico_specter = specter['se--energy2']
-                sp1 = cfm.Spectrum(in_silico_specter, axis=1)
-                real_spectra_list = self.matched_list[i][14].split("|")
-                dot = 0
-                plot_list = []
-                for real_spectrum_key in real_spectra_list:
-                    if real_spectrum_key.count("__") == 1:
-                        real_spectrum_filename = real_spectrum_key.split("__")[0]
-                        sp2 = cfm.Spectrum(self.peaks[real_spectrum_filename][real_spectrum_key], axis=0)
-                        if max(sp2.vector) != 0:
-                            plot_list.append(
-                                [np.arange(sp2.min_mz, sp2.max_mz + 1, 1), sp2.vector / max(sp2.vector) * 100])
-                        else:
-                            plot_list.append([np.nan, np.nan])
-                        dot1 = sp1.dot_product(sp2)
-                        if dot1 > dot:
-                            dot = dot1
-
-                if show_plot or save_plot:
-                    colors = plt.cm.get_cmap("hsv")(np.linspace(0, 1, len(plot_list) + 1))
-                    fig, ax = plt.subplots(1, 1)
-                    ax.vlines(np.arange(sp1.min_mz, sp1.max_mz + 1, 1), ymin=0, ymax=sp1.vector / max(sp1.vector) * 100,
-                              linestyles="solid", colors='k', label="In silico", linewidth=4, alpha=0.5)
-                    for j in range(len(plot_list)):
-                        ax.vlines(plot_list[j][0], ymin=0, ymax=plot_list[j][1],
-                                  linestyles="solid", colors=colors[j])
-                    ax.set_xlabel('mz')
-                    ax.set_ylabel('h')
-                    fig.suptitle(dot)
-                    if show_plot:
-                        fig.show()
-                    if save_plot:
-                        p1 = dep.output_path + f"/suspect_ms/{str(self.matched_list[i][0])}_" \
-                                               f"{str(self.matched_list[i][11])}_mz=" \
-                                               f"{float(self.matched_list[i][12]):.4f}.svg"
-                        fig.savefig(p1)
-                    plt.close(fig)
-                self.matched_list[i][8] = dot
-            for line in self.matched_list:
-                exp_str += ",".join([str(i) for i in line]) + "\n"
-        self.logger.log(20, f"| writing matched suspect list in {dep.output_path + output_name}")
-        conn = open(dep.output_path + output_name, "w", encoding="UTF-8")
-        conn.write(exp_str)
-        conn.close()
-
     # endregion
 
     # region export_modules
@@ -1893,7 +1831,7 @@ def find_peak_function(y, threshold, descending_threshold=0.95):
                 # this first minimum or we are ascending or it is the smallest minimum
                 previous_minimum = row
     peak_list.append([peak_start, (previous_minimum[1], previous_minimum[2])])
-    self.logger.log(10, f'||||| Obtained peak list: {peak_list}')
+    mzproject.logger_file.general_logger.log(10, f'||||| Obtained peak list: {peak_list}')
     return peak_list
 
 
