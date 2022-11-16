@@ -130,16 +130,18 @@ class Export_ms:
                     conn.write(self.expstring[-1])
 
 
-class Merge_tables:
+class MergeTables:
     def __init__(self, folder_list, names_list, ionization, output_path):
         self.folder_list = folder_list
         self.names_list = names_list
         self.ionization = ionization
-        self.table = []
         self.group_names = []
         self.output_path = output_path
-        self.table_exp = None
         self.experiment_object_list = []
+
+        self.table = []
+        self.table_exp = None
+
         self.table_s = None
         self.table_VIP = None
 
@@ -223,33 +225,30 @@ class Merge_tables:
         print(merged_counter)
 
     def export_filtered_table(self, rewrite_folder_order=None, sep=",", check_if_same=False):
+        self.table = sorted(self.table, key=lambda x: x[0] * 1000 + sum(x[5:]) * 1E-5)
         if check_if_same:
             save_path = self.output_path + "/table_merged2.csv"
         else:
             save_path = self.output_path + "/table_merged.csv"
         if rewrite_folder_order:
             self.folder_list = rewrite_folder_order
-        table_reodered = sorted(self.table, key=lambda x: self.folder_list.index(x[3]) * 1000 + sum(x[5:]) * 1E-5)
         table_exp = []
 
         added_features = set()
-        for line in table_reodered:
+        for line in self.table:
             if line[0] not in added_features:
                 table_exp.append(line)
                 added_features.add(line[0])
         table_exp = sorted(table_exp, key=lambda x: x[1] + x[2] * 0.01)
         self.table_exp = table_exp
-        conn = open(save_path, "w", encoding="UTF-8")
-        conn.write(sep.join(["index", "mz", "tr", "experiment", "old_index"] + self.names_list) + "\n")
-        for line in table_exp:
-            conn.write(sep.join([str(i) for i in line]) + "\n")
-        conn.close()
-        conn2 = open(save_path[:-4] + "_non_filtered.csv", "w", encoding="UTF-8")
-        conn2.write(sep.join(["index", "mz", "tr", "experiment", "old_index"] + self.names_list) + "\n")
-        table_reodered = sorted(self.table, key=lambda x: x[0] * 1000 + sum(x[5:]) * 1E-5)
-        for line in table_reodered:
-            conn2.write(sep.join([str(i) for i in line]) + "\n")
-        conn2.close()
+        with open(save_path, "w", encoding="UTF-8") as conn:
+            conn.write(sep.join(["index", "mz", "tr", "experiment", "old_index"] + self.names_list) + "\n")
+            for line in table_exp:
+                conn.write(sep.join([str(i) for i in line]) + "\n")
+        with open(save_path[:-4] + "_non_filtered.csv", "w", encoding="UTF-8") as conn2:
+            conn2.write(sep.join(["index", "mz", "tr", "experiment", "old_index"] + self.names_list) + "\n")
+            for line in self.table:
+                conn2.write(sep.join([str(i) for i in line]) + "\n")
         if check_if_same:
             if filecmp.cmp(self.output_path + "/table_merged2.csv", self.output_path + "/table_merged2.csv"):
                 os.remove(self.output_path + "/table_merged2.csv")
@@ -261,14 +260,14 @@ class Merge_tables:
 
     def export_simca(self, sep=","):
         save_path = self.output_path + "/table_merged_simca.csv"
-        conn = open(save_path, "w", encoding="UTF-8")
-        conn.write(sep.join(["identifier"] + self.names_list) + "\n")
         if not self.table_exp:
             raise Exception("For export you first need to generate table_exp!!")
-        for line in self.table_exp:
-            conn.write(f"V_{line[0]}_{line[1]:.4f}_{line[2]:.1f}_{line[3]}/{line[4]}" + sep)
-            conn.write(sep.join([str(i) for i in line[5:]]) + "\n")
-        conn.close()
+
+        with open(save_path, "w", encoding="UTF-8") as conn:
+            conn.write(sep.join(["identifier"] + self.names_list) + "\n")
+            for line in self.table_exp:
+                conn.write(f"V_{line[0]}_{line[1]:.4f}_{line[2]:.1f}_{line[3]}/{line[4]}" + sep)
+                conn.write(sep.join([str(i) for i in line[5:]]) + "\n")
 
     def export_ms(self, index_list=tuple(), plot_pictures=True, limit_mass=tuple()):
         # reading spectra at the start
@@ -281,7 +280,7 @@ class Merge_tables:
             if self.experiment_object_list[index]:  # MZmine
                 self.experiment_object_list[index] = read_mgf(folder + "/MS2_spectra.mgf")
             else:
-                obj = mzproject.class_file.MzProject(self.ionization)
+                obj = mzproject.class_file.MzProject()
                 conn = open(folder + "/Experiment_info.txt")
                 data = eval(conn.read())
                 conn.close()
@@ -290,7 +289,6 @@ class Merge_tables:
                 obj.add_files_speed(data[3], limit_mass=limit_mass)
                 obj.add_aligned_dict(folder, "table")
                 self.experiment_object_list[index] = obj
-        self.table = sorted(self.table, key=lambda x: x[0] * 1000 + sum(x[5:]) * 1E-5)
         # Export of table that is exported
         conn2 = open(self.output_path + "/table_final.csv", "w", encoding="UTF-8")
         conn2.write(
@@ -311,7 +309,7 @@ class Merge_tables:
                 line = line[:5] + mid_list + line[5:]
                 conn2.write(",".join([str(i) for i in line]) + "\n")
         conn2.close()
-
+        rewrite_c = dict()
         simple_plot_set = set()
         plotting_obj = None
         plotting_obj_project_name = None
@@ -332,7 +330,6 @@ class Merge_tables:
             d_1 = dict()
             for group in self.group_names:
                 d_1[group] = next(colors)
-            rewrite_c = dict()
             for name in self.names_list:
                 for key, value in d_1.items():
                     if key in name:
@@ -359,14 +356,14 @@ class Merge_tables:
                 dep.output_path = self.output_path
                 if not os.path.isdir(dep.output_path + "/feature_pictures/"):
                     os.mkdir(dep.output_path + "/feature_pictures/")
-                plotting_obj.extract_SIM(
-                    feature[1], filename=self.names_list, mztolerance=0.05,
+                plotting_obj.extract_sim(
+                    feature[1], filename=self.names_list, mz_tolerance=0.05,
                     retention_time_range=(round(feature[2] - 0.5, 1), round(feature[2] + 0.5, 1)),
                     save_graph=f"/feature_pictures/{current_index}_{feature[1]:.3f}_{feature[2]:.1f}",
                     rewrite_colors=rewrite_c)
 
-            if index_list and current_index not in index_list:
-                # If currend index is not in index list and index list is present then we should skip
+            if index_list and (current_index not in index_list):
+                # If current index is not in index list and index list is present then we should skip
                 continue
             if current_index != previous_index:
                 export_object.export_files(previous_name, export_folder)
@@ -394,7 +391,7 @@ class Merge_tables:
                 if plot_pictures:
                     dep.output_path = self.output_path
                     curr_object.plot_from_index(feature[4], save_graph=True, graph_path_folder="feature_pictures_t/",
-                                                show_plot=False)
+                                                show_plot=False, save_name_with_tuple_index=False)
                     plt.close('all')
                 peak_data_line = curr_object.aligned_dict["peak_data"][
                     curr_object.aligned_dict["peak_data"]["index"] == feature[4]]
@@ -498,12 +495,14 @@ class Merge_tables:
                 print("fffuuuuu", filename, filename_splitted)
                 # os.rename(self.output_path + "/feature_pictures_t/" + filename,
                 #           self.output_path + "/feature_pictures/" + filename)
+        os.rmdir(self.output_path + "/feature_pictures_t")
 
-    def get_VIP(self, scale=True, log10=True):
+    def get_VIP(self, scale=True, log10=True, Y=None):
         df = pd.DataFrame(self.table, columns=["index", "mz", "tr", "experiment", "old_index"] + self.names_list)
         filter_vals2 = [i for i in df.columns if "xml" in i]
         vals_df = df[filter_vals2]
-        Y = np.array([not "blank" in i.lower() for i in vals_df.columns], dtype=int)
+        if Y is None:
+            Y = np.array([not "blank" in i.lower() for i in vals_df.columns], dtype=int)
         X = vals_df.values.T
         # X = X - X.mean(axis=1)[None].T
         plsr = PLSRegression(2, scale=scale)  # --> scale=False zgleda mogoče celo bolje!
@@ -538,9 +537,25 @@ class Merge_tables:
 
         return df
 
-    def read_simca_output(self, folder, name_VIP, min_VIP=0, max_features=-1, name_s_plot="", limit_mz=tuple()):
+    def save_object(self):
+        with open(self.output_path + "/object_data.dat", 'w') as conn:
+            conn.write(repr(self.folder_list) + '\n')
+            conn.write(repr(self.names_list) + '\n')
+            conn.write(repr(self.ionization) + '\n')
+            conn.write(repr(self.group_names) + '\n')
+            conn.write(repr(self.output_path) + '\n')
+            temp_list1 = [i is True for i in self.experiment_object_list]
+            conn.write(repr(temp_list1) + '\n')
+
+        if not os.path.isfile(self.output_path + "/table_merged.csv"):
+            raise FileNotFoundError("ther eis no merged table!")
+
+        if not os.path.isfile(self.output_path + "/table_merged.csv"):
+            raise FileNotFoundError("ther eis no merged table!")
+
+    def read_simca_output(self, name_VIP, min_VIP=0, max_features=-1, name_s_plot="", limit_mz=tuple()):
         table, header = f.read_simple_file_list(
-            mzproject.paths.IJS_ofline_path + folder + "/" + name_VIP,
+            mzproject.paths.IJS_ofline_path + name_VIP,
             types=[str, float, float], header=True, sep="\t")
         table = [tuple(i) for i in table]
         table = np.array(table, dtype=[("name", "<U100"), ("VIP", float), ("V2", float)])
@@ -561,7 +576,7 @@ class Merge_tables:
         table_VIP = table
         if name_s_plot:
             table, header = f.read_simple_file_list(
-                mzproject.paths.IJS_ofline_path + folder + "/" + name_s_plot,
+                mzproject.paths.IJS_ofline_path + name_s_plot,
                 types=[str, str, str], header=True, sep="\t")
             table = [tuple(i) for i in table if i[1] != "-0"]
             table = np.array(table, dtype=[("name", "<U100"), ("x", float), ("y", float)])
@@ -578,6 +593,50 @@ class Merge_tables:
         self.table_VIP = table_VIP
 
         return indexes
+
+
+def table_type(i):
+    if i == 0 or i == 4:
+        return int
+    elif i == 3:
+        return str
+    else:
+        return float
+
+
+def import_merge_tables_object(folder_path):
+    with open(folder_path + '/object_data.dat', 'r') as conn:
+        lines = conn.readlines()
+    folder_list = eval(lines[0].strip())
+    names_list = eval(lines[1].strip())
+    ionization = eval(lines[2].strip())
+    group_names = eval(lines[3].strip())
+    output_path = eval(lines[4].strip())
+    experiment_object_list = eval(lines[5].strip())
+    exp_obj = MergeTables(folder_list, names_list, ionization, output_path)
+    exp_obj.experiment_object_list = experiment_object_list
+    exp_obj.group_names = group_names
+
+    table_exp = []
+    with open(output_path + "/table_merged.csv", 'r') as conn:
+        lines = conn.readlines()
+    for i in lines[1:]:
+        i = i.strip().split(',')
+        for ind_i, val_i in enumerate(i):
+            i[ind_i] = table_type(ind_i)(val_i)
+        table_exp.append(i)
+
+    table = []
+    with open(output_path + "/table_merged_non_filtered.csv", 'r') as conn:
+        lines = conn.readlines()
+    for i in lines[1:]:
+        i = i.strip().split(',')
+        for ind_i, val_i in enumerate(i):
+            i[ind_i] = table_type(ind_i)(val_i)
+        table.append(i)
+    exp_obj.table = table
+    exp_obj.table_exp = table_exp
+    return exp_obj
 
 
 def vip(x, y, model):
@@ -599,11 +658,8 @@ def vip(x, y, model):
 
     return vips
 
-mzproject.merge_tables.do_all(r"C:/Users/tinc9/Documents/IJS-offline/Experiment/simulant_neg_low_mz/", file_list,
-              ["python_beer_simulant_neg_lowmz"], "neg", True,
-              tuple(), "Experiment/simca_results/simca_simulant_neg_lowmz",
-                           "General-List_VIP_opls-da_mzLow.txt", "General-List_s-plot_opls-da_mzLow.txt")
-def generate_ensemble_list(folder_project, file_list, project_list, polarity, limit_mass=tuple()):
+
+def generate_ensemble_list(folder_project, file_list, project_list, polarity):
     """
     This function gets folder of a project and information about projects and returns ensemble table that
     merges all methods that generate feature lists as well as 2d table that is suitable as simca input.
@@ -611,66 +667,60 @@ def generate_ensemble_list(folder_project, file_list, project_list, polarity, li
     files will be generated
     :param file_list: list of raw files (sample analysis files)
     :param project_list: list of names of folders of projects that we want to merge
-    :param polarity: Pos/Neg
-    :limit_mass: If you generated files in python with limit_mass you also need to put same tuple here!
+    :param polarity: pos/neg
     :return: None
     """
-    obj = Merge_tables(project_list, file_list, polarity, folder_project)
+    obj = MergeTables(project_list, file_list, polarity, folder_project)
     obj.generate_table()
     obj.add_new_indexes()
     obj.export_averaged_table()
     obj.export_filtered_table()
     obj.export_simca(",")
+    obj.save_object()
 
-def export_ms(folder_project, file_list, project_list, polarity, from_simca=False, interesting_indexes=np.array([]),
-              simca_files_tuple=tuple(), limit_mass=tuple()):
+
+def extract_msms_from_vip_features(recover_object_path, interesting_indexes=tuple(),
+                                   file_vip_simca="", file_s_simca="", limit_mass=tuple(), manual_pls_labels=None,
+                                   export_all_features=False, min_VIP=1, max_features=100):
     """
-    After we exported tables and obtained
-    :param folder_project: Path to the folder that keeps project folders and at the same time place where new
-    files will be generated
-    :param file_list: list of raw files (sample analysis files)
-    :param project_list: list of names of folders of projects that we want to merge
-    :param polarity: Pos/Neg
-    :return: None
+    This function exports MSMS spectra from important features. This can be either done by specifying list of indices
+    that are interesting or supplying files from simca.
+    VIP SCORES THAT ARE AUTOMATICALLY CALCULATED ARE NOT THE SAME AS ONES OBTAINED BY SIMCA!
+    :param export_all_features: If True then algorithm exports all features that are present.
+    :param manual_pls_labels: If we let automatic calculation of vip scores, then we can manually set responses
+    :param recover_object_path:
+    :param interesting_indexes:
+    :param file_vip_simca: absolute path; space separated file, where first row is header and first column is name of
+    feature, second column is VIP (or equivalent wellness score) and third column is not used but it has to be float
+    :param file_s_simca: it is plot of 2d projection of the multidimensional space with header (and space separated). It
+    also has 3 columns: name, x, y
+    :param limit_mass: If python project has been generated with limit_mass it is crucial that also here this parameter
+    is used!
+    :return:
     """
-    obj = Merge_tables(project_list, file_list, polarity, folder_project)
-    obj.generate_table()
-    obj.add_new_indexes()
-    obj.export_averaged_table(check_if_same=True)
-    obj.export_filtered_table(check_if_same=True)
-
-    if from_simca:
-        folder_simca, file_vip_simca, file_s_simca = simca_files_tuple
-        interesting_indexes = obj.read_simca_output(folder_simca, file_vip_simca, 1, 100, file_s_simca, limit_mass)
-        obj.export_ms(interesting_indexes, limit_mass=limit_mass)
-    else:
-        obj.export_ms(interesting_indexes, limit_mass=limit_mass)
-    return obj
-
-
-
-def do_all(path1, file_list, project_list, polarity, export_ms=False, interesting_indexes=tuple(),
-           folder_simca="", file_vip_simca="", file_s_simca="", limit_mass=tuple()):
-    obj = Merge_tables(project_list, file_list, polarity, path1)
-    obj.generate_table()
-    obj.add_new_indexes()
-    obj.export_averaged_table()
-    obj.export_filtered_table()
-    obj.export_simca(",")
-
-    if export_ms:
-        if not interesting_indexes:
-            interesting_indexes = obj.read_simca_output(folder_simca, file_vip_simca, 1, 100, file_s_simca, limit_mass)
-            if limit_mass:
-                pass
+    obj = import_merge_tables_object(recover_object_path)
+    if not interesting_indexes and not export_all_features:
+        if file_vip_simca:
+            interesting_indexes = obj.read_simca_output(file_vip_simca, min_VIP, max_features, file_s_simca, limit_mass)
         else:
-            df = obj.get_VIP(True, True)
-            v1 = df[["index", "VIP"]].values
-            interesting_indexes = v1
-        obj.export_ms(interesting_indexes, limit_mass=limit_mass)
+            df = obj.get_VIP(True, True, Y=manual_pls_labels)
+            df = df[df['VIP']> min_VIP]
+            v1 = df["index"].values.tolist()
+            interesting_indexes = [int(i) for i in v1][:max_features]
+    obj.export_ms(interesting_indexes, limit_mass=limit_mass)
     return obj
-
 
 
 if __name__ == "__main__":
-    pass
+    # mzproject.merge_tables.do_all(r"C:/Users/tinc9/Documents/IJS-offline/Experiment/simulant_neg_low_mz/", file_list,
+    #                               ["python_beer_simulant_neg_lowmz"], "neg", True,
+    #                               tuple(), "Experiment/simca_results/simca_simulant_neg_lowmz",
+    #                               "General-List_VIP_opls-da_mzLow.txt", "General-List_s-plot_opls-da_mzLow.txt")
+    files = f.get_files()
+    # obj1 = generate_ensemble_list(r"C:/Users/tinc9/Documents/IJS-offline/test_python/", [i for i in files if "QC_MIX" in i],
+    #                         ['test_python', 'mzmine_test'], "neg")
+    # obj2 = import_merge_tables_object(r"C:/Users/tinc9/Documents/IJS-offline/test_python/")
+
+    obj3 = extract_msms_from_vip_features(r"C:/Users/tinc9/Documents/IJS-offline/test_python/",
+                                          interesting_indexes=tuple(), manual_pls_labels=[0, 0, 0, 1, 1, 1],
+                                          limit_mass=(200, 250), max_features=20)
