@@ -29,16 +29,133 @@ def get_files_QC_features():
     return QC_features, f_list_neg, f_list_pos
 
 
-def run_one_experiment(file_list, name="test1", polarity="neg", subdirectory="test", change_dict=tuple(),
-                       QC_features=tuple(), from_table=False, comment="", compare_with_qc=False, file_group_list=("MIX2", "MIX1", "Blank"),
-                       save_peak_graphs=True, limit_mz=tuple()):
+def _compare_table_with_qc(peak_data_table, rel_path, python, h_table, A_table, mzproject_obj, QC_features, comment,
+                           polarity, ratio_mz_tr, reduce_file, file_group_list, filenames, save_peak_graphs=False):
+    output_dict = dict()
+    name_dict = dict()
+    for one_name in file_group_list:
+        name_dict[one_name] = []
+        output_dict[one_name] = []
+    for i, col_name in enumerate(filenames):
+        for one_name in file_group_list:
+            if one_name in col_name:
+                name_dict[one_name].append(i)
+                break
+
+    if python:
+        d2_list = []
+        d2_list_colnames = ["name", "mz1", "mz2", "tr"] + mzproject_obj.filename
+
+    # output np.array
+    out_string = f"{comment}\n{polarity} mode\n"
+
+    for compound in QC_features:
+        output_line = np.array([0], dtype=types)
+
+        if not ((compound['mode'] == "+" and polarity == "pos") or (compound['mode'] == "-" and polarity == "neg")):
+            continue
+        out_string += f"--{compound['name']}------------------------\n"
+
+        close_features = peak_data_table[
+            (abs(peak_data_table["mz"] - compound["mz_ion"]) < 0.2) &
+            (abs(peak_data_table["tr"] - compound["tr"]) < 0.5)
+            ]
+        if len(close_features) == 0:
+            out_string += "\tDidn't found similar mass feature!\n"
+            output_line["d_mz"] = np.nan
+            output_line["d_tr"] = np.nan
+            output_line["n_MSMS"] = 0
+            output_line["n"] = 0
+            output_line["h"] = 0
+            for key, value in name_dict.items():
+                output_dict[key].append(output_line[0].copy())
+            continue
+        best_feature = np.argmin(abs(close_features["mz"] - compound["mz_ion"]) * ratio_mz_tr + abs(
+            close_features["tr"] - compound["tr"]))
+        arr1 = close_features[best_feature]
+        best_feature_index = arr1["index"]
+        if python and save_peak_graphs:
+            mzproject_obj.plot_from_index(best_feature_index, save_graph=True, show_plot=False)
+        out_string += f"\tIndex: {best_feature_index}\n"
+        out_string += f"\tmz difference: {compound['mz_ion'] - arr1['mz']:.6f}"
+        out_string += f" ~ {(compound['mz_ion'] - arr1['mz']) / compound['mz_ion'] * 1E6:.2f}ppm\n"
+        output_line["d_mz"] = compound['mz_ion'] - arr1['mz']
+        out_string += f"\ttr difference: {compound['tr'] - arr1['tr']:.3f}\n"
+        output_line["d_tr"] = compound['tr'] - arr1['tr']
+        if python:
+            spectra_number = len(arr1["scans"].split("|"))
+        else:
+            MSMS_dict = get_MSMS_number(dep.IJS_ofline_path + f"/{rel_path}/MS2_spectra.mgf", reduce_file)
+            if int(best_feature_index) in MSMS_dict:
+                spectra_number = MSMS_dict[int(best_feature_index)]
+            else:
+                spectra_number = 0
+                print(best_feature_index)
+        out_string += f'\tNumber of MSMS spectra: {spectra_number}\n\n'
+        output_line["n_MSMS"] = spectra_number
+        # for getting line for every feature:
+        aligned_dict_index = np.argwhere(peak_data_table == arr1)[0][0]
+        if python:
+            d2_list.append([compound['name'], compound['mz_ion'],
+                            arr1['mz'], compound["tr"]] + list(h_table[aligned_dict_index]))
+
+        for key, value in name_dict.items():
+            count = 0
+            h_sum1 = []
+            A_sum1 = []
+            for index2 in value:
+                h1 = h_table[aligned_dict_index][index2]
+                if h1 > 0:
+                    count += 1
+                    h_sum1.append(h1)
+                    A_sum1.append(A_table[best_feature][index2])
+            if len(h_sum1) > 0:
+                h_sum = np.average(h_sum1)
+                A_sum = np.average(A_sum1)  # AVERAGE HEIGHT OF PEAK THAT IS PRESENT!!!
+            else:
+                h_sum = A_sum = 0
+            out_string += f"\t{key}:\n"
+            out_string += f"\t\tfound {count}/{len(value)} features\n"
+            out_string += f"\t\tavg h {h_sum:.2f}\n"
+            out_string += f"\t\tavg A {A_sum:.2f}\n"
+            output_line['n'] = count
+            output_line['h'] = h_sum
+            output_dict[key].append(output_line[0].copy())
+        # SPECIFIC FOR MIX1 AND MIX2!!!!!!!
+
+        # out_string += f"\t\t Ratio MIX2/MIX1: A-{dict_for_ratio['MIX2'][1] / dict_for_ratio['MIX1'][1]:.2f}"
+        # out_string += f" h-{dict_for_ratio['MIX2'][0] / (dict_for_ratio['MIX1'][0] + 1):.2f}\n"
+        # +1 for division by 0 (no influence for ~1E4)
+
+        out_string += "\n\n"
+
+        # output_list.append(output_line)
+    # output_list = np.array(output_list)
+    for one_name in file_group_list:
+        np.savetxt(dep.IJS_ofline_path + f"/{rel_path}/Experiment_results_{one_name}.txt",
+                   output_dict[one_name], fmt=['%f', '%f', '%i', '%i', '%f'])
+    if python:
+        with open(dep.IJS_ofline_path + f"/{rel_path}/2d_table.txt", "w") as conn:
+            conn.write(",".join(d2_list_colnames) + "\n")
+            for line in d2_list:
+                conn.write(",".join([str(i) for i in line]) + "\n")
+
+    print(out_string)
+    conn = open(dep.IJS_ofline_path + f"/{rel_path}/QC_report.txt", "w", encoding="UTF-8")
+    conn.write(out_string)
+    conn.close()
+
+
+def run_one_experiment(file_list, name="test1", polarity="neg", input_path=None, subdirectory="test",
+                       change_dict=tuple(), QC_features=tuple(), from_table=False, comment="", compare_with_qc=False,
+                       file_group_list=("MIX2", "MIX1", "Blank"), save_peak_graphs=True, limit_mz=tuple(),
+                       ratio_mz_tr=50):
     # Measuring time at start
     start_time = time.perf_counter()
     current_time = datetime.now().strftime("%H:%M:%S")
-    print("Current Time =", current_time)
-    output_dict = dict()
-    if polarity == "pos":
-        dep.input_path = paths.input_path_pos
+    if input_path is not None:
+        dep.input_path = input_path
+    print(f"Current Time ={current_time}, reading files from {dep.input_path}")
     if not os.path.isdir(dep.IJS_ofline_path + f"/{subdirectory}"):
         os.mkdir(dep.IJS_ofline_path + f"/{subdirectory}")
     if not os.path.isdir(dep.IJS_ofline_path + f"/{subdirectory}/{name}"):
@@ -79,118 +196,19 @@ def run_one_experiment(file_list, name="test1", polarity="neg", subdirectory="te
         conn = open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/report.txt", "w", encoding="UTF-8")
         conn.write(obj() + "\n\n\n" + string1)
         conn.close()
-    ratio_mz_tr = 50
 
     # Saving additional data
     out1 = [name, polarity, comment, file_list, file_group_list]
-    conn = open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/Experiment_info.txt", "w", encoding="UTF-8")
-    conn.write(repr(out1))
-    conn.close()
+    with open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/Experiment_info.txt", "w", encoding="UTF-8") as conn:
+        conn.write(repr(out1))
     if not compare_with_qc:
         return 0
-    # calculation for report
-    name_dict = dict()
-    for one_name in file_group_list:
-        name_dict[one_name] = []
-        output_dict[one_name] = []
-    for i, name_file in enumerate(obj.filename):
-        for one_name in file_group_list:
-            if one_name in name_file:
-                name_dict[one_name].append(i)
-                break
-
-
-    d2_list = []
-    d2_list_colnames = ["name", "mz1", "mz2", "tr"] + obj.filename
-
-    # output np.array
-    out_string = f"{comment}\n{polarity} mode\n"
     if len(QC_features) > 0:
-        for compound in QC_features:
-            output_line = np.array([0], dtype=types)
-
-            if not ((compound['mode'] == "+" and polarity == "pos") or (compound['mode'] == "-" and polarity == "neg")):
-                continue
-            out_string += f"--{compound['name']}------------------------\n"
-            close_features = obj.aligned_dict["peak_data"][
-                (abs(obj.aligned_dict["peak_data"]["mz"] - compound["mz_ion"]) < 0.2) &
-                (abs(obj.aligned_dict["peak_data"]["tr"] - compound["tr"]) < 0.5)
-                ]
-            if len(close_features) == 0:
-                out_string += "\tDidn't found similar mass feature!\n"
-                output_line["d_mz"] = np.nan
-                output_line["d_tr"] = np.nan
-                output_line["n_MSMS"] = 0
-                output_line["n"] = 0
-                output_line["h"] = 0
-                for key, value in name_dict.items():
-                    output_dict[key].append(output_line[0].copy())
-                continue
-            best_feature = np.argmin(abs(close_features["mz"] - compound["mz_ion"]) * ratio_mz_tr + abs(
-                close_features["tr"] - compound["tr"]))
-            arr1 = close_features[best_feature]
-            best_feature_index = arr1["index"]
-            if save_peak_graphs:
-                obj.plot_from_index(best_feature_index, save_graph=True, show_plot=False)
-            out_string += f"\tIndex: {best_feature_index}\n"
-            out_string += f"\tmz difference: {compound['mz_ion'] - arr1['mz']:.6f}"
-            out_string += f" ~ {(compound['mz_ion'] - arr1['mz']) / compound['mz_ion'] * 1E6:.2f}ppm\n"
-            output_line["d_mz"] = compound['mz_ion'] - arr1['mz']
-            out_string += f"\ttr difference: {compound['tr'] - arr1['tr']:.3f}\n"
-            output_line["d_tr"] = compound['tr'] - arr1['tr']
-            spectra_number = len(arr1["scans"].split("|"))
-            out_string += f'\tNumber of MSMS spectra: {spectra_number}\n\n'
-            output_line["n_MSMS"] = spectra_number
-            # for getting line for every feature:
-            aligned_dict_index = np.argwhere(obj.aligned_dict["peak_data"] == arr1)[0][0]
-            d2_list.append([compound['name'], compound['mz_ion'],
-                            arr1['mz'], compound["tr"]] + list(obj.aligned_dict["h"][aligned_dict_index]))
-
-            for key, value in name_dict.items():
-                count = 0
-                h_sum1 = []
-                A_sum1 = []
-                for index2 in value:
-                    h1 = obj.aligned_dict["h"][aligned_dict_index][index2]
-                    if h1 > 0:
-                        count += 1
-                        h_sum1.append(h1)
-                        A_sum1.append(obj.aligned_dict["A"][best_feature][index2])
-                if len(h_sum1) > 0:
-                    h_sum = np.average(h_sum1)
-                    A_sum = np.average(A_sum1)  # AVERAGE HEIGHT OF PEAK THAT IS PRESENT!!!
-                else:
-                    h_sum = A_sum = 0
-                out_string += f"\t{key}:\n"
-                out_string += f"\t\tfound {count}/{len(value)} feautes\n"
-                out_string += f"\t\tavg h {h_sum:.2f}\n"
-                out_string += f"\t\tavg A {A_sum:.2f}\n"
-                output_line['n'] = count
-                output_line['h'] = h_sum
-                output_dict[key].append(output_line[0].copy())
-            # SPECIFIC FOR MIX1 AND MIX2!!!!!!!
-
-            # out_string += f"\t\t Ratio MIX2/MIX1: A-{dict_for_ratio['MIX2'][1] / dict_for_ratio['MIX1'][1]:.2f}"
-            # out_string += f" h-{dict_for_ratio['MIX2'][0] / (dict_for_ratio['MIX1'][0] + 1):.2f}\n"
-            # +1 for division by 0 (no influence for ~1E4)
-
-            out_string += "\n\n"
-
-            # output_list.append(output_line)
-        # output_list = np.array(output_list)
-        for one_name in file_group_list:
-            np.savetxt(dep.IJS_ofline_path + f"/{subdirectory}/{name}/Experiment_results_{one_name}.txt",
-                       output_dict[one_name], fmt=['%f', '%f', '%i', '%i', '%f'])
-
-        with open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/2d_table.txt", "w") as conn:
-            conn.write(",".join(d2_list_colnames) + "\n")
-            for line in d2_list:
-                conn.write(",".join([str(i) for i in line]) + "\n")
-
-    print(out_string)
-    conn = open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/QC_report.txt", "w", encoding="UTF-8")
-    conn.write(out_string)
-    conn.close()
+        _compare_table_with_qc(peak_data_table=obj.aligned_dict["peak_data"], rel_path=f"{subdirectory}/{name}",
+                               h_table=obj.aligned_dict["h"], A_table=obj.aligned_dict["A"], python=True,
+                               mzproject_obj=obj, QC_features=QC_features, comment=comment, polarity=polarity,
+                               ratio_mz_tr=ratio_mz_tr, reduce_file=False, file_group_list=file_group_list,
+                               filenames=obj.filename, save_peak_graphs=save_peak_graphs)
 
 
 def get_MSMS_number(path_to_file, reduce_file=True):
@@ -217,7 +235,7 @@ def get_MSMS_number(path_to_file, reduce_file=True):
 
 def run_one_experiment_mzmine(name, subdirectory, file_list, file_group_list, QC_features, polarity="neg", comment="",
                               protocol="MSMS_peaklist_builder", change_dict=None, calculate_table=True,
-                              reduce_file=True, save_project=""):
+                              reduce_file=True, save_project="", ratio_mz_tr=50):
     if change_dict is None:
         change_dict = dict()
     out1 = [name, polarity, comment, file_list, file_group_list]
@@ -279,8 +297,6 @@ def run_one_experiment_mzmine(name, subdirectory, file_list, file_group_list, QC
         conn.write(repr(out1))
         conn.close()
 
-    MSMS_dict = get_MSMS_number(dep.IJS_ofline_path + f"/{subdirectory}/{name}/MS2_spectra.mgf", reduce_file)
-
     conn = open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/quant_table.csv", "r")
     text = conn.readlines()
     conn.close()
@@ -292,98 +308,15 @@ def run_one_experiment_mzmine(name, subdirectory, file_list, file_group_list, QC
     table = np.array(table)
     columns = columns.strip().split(",")[:-1]
 
-    output_dict = dict()
-    name_dict = dict()
-    for one_name in file_group_list:
-        name_dict[one_name] = []
-        output_dict[one_name] = []
-    for i, col_name in enumerate(columns):
-        for one_name in file_group_list:
-            if one_name in col_name:
-                name_dict[one_name].append(i)
-                break
-
-    out_string = f"{comment}\n{polarity} mode\n"
     if len(QC_features) > 0:
-        for compound in QC_features:
-            output_line = np.array([0], dtype=types)
-
-            if not ((compound['mode'] == "+" and polarity == "pos") or (
-                    compound['mode'] == "-" and polarity == "neg")):
-                continue
-            out_string += f"--{compound['name']}------------------------\n"
-
-            close_features = table[
-                (abs(table[:, 1] - compound["mz_ion"]) < 0.2) &
-                (abs(table[:, 2] - compound["tr"]) < 0.5)
-                ]
-            if len(close_features) == 0:
-                out_string += "\tDidn't found similar mass feature!\n"
-                output_line["d_mz"] = np.nan
-                output_line["d_tr"] = np.nan
-                output_line["n_MSMS"] = 0
-                output_line["n"] = 0
-                output_line["h"] = 0
-                for key, value in name_dict.items():
-                    output_dict[key].append(output_line[0].copy())
-                continue
-            best_feature = np.argmin(abs(close_features[:, 1] - compound["mz_ion"]) * 50 + abs(
-                close_features[:, 2] - compound["tr"]))
-            arr1 = close_features[best_feature]
-            best_feature_index = arr1[0]
-            out_string += f"\tIndex: {best_feature_index}\n"
-            out_string += f"\tmz difference: {compound['mz_ion'] - arr1[1]:.6f}"
-            out_string += f" ~ {(compound['mz_ion'] - arr1[1]) / compound['mz_ion'] * 1E6:.2f}ppm\n"
-            output_line["d_mz"] = compound['mz_ion'] - arr1[1]
-            out_string += f"\ttr difference: {compound['tr'] - arr1[2]:.3f}\n"
-            output_line["d_tr"] = compound['tr'] - arr1[2]
-            if int(best_feature_index) in MSMS_dict:
-                spectra_number = MSMS_dict[int(best_feature_index)]
-            else:
-                spectra_number = 0
-                print(best_feature_index)
-            out_string += f'\tNumber of MSMS spectra: {spectra_number}\n\n'
-            output_line["n_MSMS"] = spectra_number
-            for key, value in name_dict.items():
-                count = 0
-                h_sum1 = []
-                A_sum1 = []
-                for index2 in value:
-                    h1 = arr1[index2]
-                    if h1 > 0:
-                        count += 1
-                        h_sum1.append(h1)
-                        A_sum1.append(0)
-                if len(h_sum1) > 0:
-                    h_sum = np.average(h_sum1)
-                    A_sum = np.average(A_sum1)  # AVERAGE HEIGHT OF PEAK THAT IS PRESENT!!!
-                else:
-                    h_sum = A_sum = 0
-                out_string += f"\t{key}:\n"
-                out_string += f"\t\tfound {count}/{len(value)} feautes\n"
-                out_string += f"\t\tavg h {h_sum:.2f}\n"
-                out_string += f"\t\tavg A {A_sum:.2f}\n"
-                output_line['n'] = count
-                output_line['h'] = h_sum
-                output_dict[key].append(output_line[0].copy())
-            # SPECIFIC FOR MIX1 AND MIX2!!!!!!!
-
-            # out_string += f"\t\t Ratio MIX2/MIX1: A-{dict_for_ratio['MIX2'][1] / dict_for_ratio['MIX1'][1]:.2f}"
-            # out_string += f" h-{dict_for_ratio['MIX2'][0] / (dict_for_ratio['MIX1'][0] + 1):.2f}\n"
-            # +1 for division by 0 (no influence for ~1E4)
-
-            out_string += "\n\n"
-
-            # output_list.append(output_line)
-        # output_list = np.array(output_list)
-        for one_name in file_group_list:
-            np.savetxt(dep.IJS_ofline_path + f"/{subdirectory}/{name}/Experiment_results_{one_name}.txt",
-                       output_dict[one_name], fmt=['%f', '%f', '%i', '%i', '%f'])
-
-    print(out_string)
-    conn = open(dep.IJS_ofline_path + f"/{subdirectory}/{name}/QC_report.txt", "w", encoding="UTF-8")
-    conn.write(out_string)
-    conn.close()
+        h_table = table[:, 3:]
+        temp_table = table[:, :3]
+        peak_data_table = np.array([tuple(i) for i in temp_table],
+                                   dtype=[('index', '<i4'), ('mz', '<f8'), ('tr', '<f8')])
+        _compare_table_with_qc(peak_data_table=peak_data_table, rel_path=f"{subdirectory}/{name}",
+                               h_table=h_table, A_table=np.zeros(h_table.shape), python=False, mzproject_obj=None,
+                               QC_features=QC_features, comment=comment, polarity=polarity, ratio_mz_tr=ratio_mz_tr,
+                               reduce_file=reduce_file, file_group_list=file_group_list, filenames=columns[3:])
 
 
 def generate_3D_table(file_list, QC_features):
@@ -505,13 +438,19 @@ if __name__ == "__main__":
     np.seterr(all='raise')
     QC_features, f_list_neg, f_list_pos = get_files_QC_features()
 
+    run_one_experiment(f_list_neg[:6], 'test_python', 'neg', subdirectory='test_python', QC_features=QC_features,
+                       compare_with_qc=True, limit_mz=(200, 250), )
+    # run_one_experiment_mzmine('mzmine_test', 'test_python', [i for i in f_list_neg if "QC_MIX" in i],
+    #                           ['MIX1', "MIX2"], QC_features)
+
     # table_of_paths = ["Experiment/neg/EtOH_QC", "Experiment/neg/Beer_QC", "Experiment/neg/WW_QC",
     #                   "Experiment/neg/EtOH_QC_MIX1", "Experiment/neg/EtOH_QC_MIX1_random",
     #                   "Experiment/neg/EtOH_QC_random", "Experiment/neg/MZmine_EtOH_QC",
     #                   "Experiment/neg/MZmine_WW_QC","Experiment/neg/MZmine_Beer_QC",
     #                   ]
-    table_of_paths = os.listdir(paths.IJS_ofline_path + "/Experiment/neg3/")
-    table_of_paths = ["Experiment/neg3/" + i for i in table_of_paths]
-    tup = generate_3D_table(table_of_paths, QC_features)
-    print(tup[2])
-    # MIX1 + Blank  || MIX2 + MIX1 + Blank + random samples
+
+    # table_of_paths = os.listdir(paths.IJS_ofline_path + "/Experiment/neg3/")
+    # table_of_paths = ["Experiment/neg3/" + i for i in table_of_paths]
+    # tup = generate_3D_table(table_of_paths, QC_features)
+    # print(tup[2])
+    # # MIX1 + Blank  || MIX2 + MIX1 + Blank + random samples
