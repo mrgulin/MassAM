@@ -678,7 +678,7 @@ class MzProject:
         split_peak_group_obj.med_tr.append(med_tr)
 
     def plot_from_index(self, index, index_tuple=(), save_graph=False, graph_path_folder: str = "graphs2/",
-                        show_plot=True, save_name_with_tuple_index=True):
+                        show_plot=True, manual_index=None):
         warnings.warn('THIS HAS TO BE UPDATED!!')
         if not self.mergedMS2scans:
             self.filter_constant_ions(save_deleted="")
@@ -706,10 +706,7 @@ class MzProject:
         plot_data = [value for key, value in split_peak_group_obj.raw_data.items() if
                      key[1] == index_tuple[1]]
         start_comment = str(index_tuple)
-        if not save_name_with_tuple_index:
-            if index == -1:
-                raise ValueError("You shouldn't use save_name_with_tuple_index = False if you plot with help of "
-                                 "the tuple")
+        if manual_index is not None:
             start_comment = str(index)
         plot_graph(plot_data, plot_names, dep.output_path + graph_path_folder,
                    f"mz={split_peak_group_obj.med_mz[-1]:.4f}_tr={split_peak_group_obj.med_tr[-1]:.2f}",

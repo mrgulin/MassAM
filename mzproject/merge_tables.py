@@ -13,6 +13,7 @@ from sklearn.cross_decomposition import PLSRegression
 import matplotlib.cm as cm
 import matplotlib.colors
 import filecmp
+import re  # for regex
 
 
 def color_map_color(value, cmap_name='hsv', vmin=0, vmax=2):
@@ -145,6 +146,11 @@ class MergeTables:
         self.table_s = None
         self.table_VIP = None
 
+        self.plotting_obj = None
+        self.plotting_obj_project_name = None
+
+        self.rewrite_c = None
+
     def generate_table(self):
         table = []  # new index, mz, tr, project, old index, heights...
 
@@ -269,11 +275,7 @@ class MergeTables:
                 conn.write(f"V_{line[0]}_{line[1]:.4f}_{line[2]:.1f}_{line[3]}/{line[4]}" + sep)
                 conn.write(sep.join([str(i) for i in line[5:]]) + "\n")
 
-    def export_ms(self, index_list=tuple(), plot_pictures=True, limit_mass=tuple()):
-        # reading spectra at the start
-        export_folder = self.output_path + "/sirius/"
-        if not os.path.isdir(export_folder):
-            os.mkdir(export_folder)
+    def import_mgf_and_mzobject(self, limit_mass):
         for index, val in enumerate(self.folder_list):
             print(f"reading file: {val}")
             folder = self.output_path + self.folder_list[index]
@@ -289,6 +291,77 @@ class MergeTables:
                 obj.add_files_speed(data[3], limit_mass=limit_mass)
                 obj.add_aligned_dict(folder, "table")
                 self.experiment_object_list[index] = obj
+
+    def set_plotting_object(self, limit_mass=tuple(), manual_index=None, plot_images=True):
+        self.import_mgf_and_mzobject(limit_mass=limit_mass)
+        if not plot_images:
+            return 0
+        if manual_index is not None:
+            if type(self.experiment_object_list[manual_index]) == dict:
+                raise TypeError("Wrong index of project! This is MZmine project and not python project! You can only"
+                                "plot with python object")
+        for index2, i in enumerate(self.experiment_object_list):
+            if type(i) != dict:
+                # Searching for python object to get to plot pictures
+                self.plotting_obj = i
+                self.plotting_obj_project_name = self.folder_list[index2]
+                return 0
+
+    def precalculate_plot_colors(self, plot_pictures=True, blank_regex='(?i).*blank.*'):
+        if plot_pictures:
+            rewrite_c = dict()
+            if not self.group_names:
+                raise Exception("You have to group files in order to get pictures!!!")
+            if len(self.group_names) > 10:
+                palette = plt.cm.tab20
+            else:
+                palette = plt.cm.tab10
+            colors = iter([palette(i) for i in range(len(self.group_names))])
+            d_1 = dict()
+            for group in self.group_names:
+                d_1[group] = next(colors)
+            for name in self.names_list:
+                for key, value in d_1.items():
+                    if key in name:
+                        if re.search(blank_regex, name):
+                            linestyle = "dashed"
+                        else:
+                            linestyle = "solid"
+                        rewrite_c[name] = (linestyle, value)
+                        break
+                else:
+                    raise Exception(f"No group for {name}")
+            self.rewrite_c = rewrite_c
+
+    def plot_sim(self, current_index, mz, tr):
+        if self.plotting_obj is None:
+            print("There is no python MzProject object yet so I am creating one with default arguments (no limit_mz)!")
+            self.set_plotting_object()
+        if self.rewrite_c is None:
+            print("There is no color palette yet so I am creating one with default arguments!")
+            self.precalculate_plot_colors()
+        self.plotting_obj: mzproject.class_file.MzProject
+        self.plotting_obj.extract_sim(
+            mz, filename=self.names_list, mz_tolerance=0.05,
+            retention_time_range=(round(tr - 0.5, 1), round(tr + 0.5, 1)),
+            save_graph=f"/feature_pictures/{current_index}_{mz:.3f}_{tr:.1f}",
+            rewrite_colors=self.rewrite_c)
+
+    def plot_python_peak_report_graph(self, python_old_index, manual_mzproject_obj=None, new_index=None):
+        if manual_mzproject_obj is not None:
+            plot_obj = manual_mzproject_obj
+        else:
+            plot_obj = self.plotting_obj
+        plot_obj.plot_from_index(python_old_index, save_graph=True, graph_path_folder="feature_pictures/",
+                                 show_plot=False, manual_index=new_index)
+        plt.close('all')
+
+    def export_ms(self, index_list=tuple(), plot_pictures=True, limit_mass=tuple()):
+        # reading spectra at the start
+        export_folder = self.output_path + "/sirius/"
+        if not os.path.isdir(export_folder):
+            os.mkdir(export_folder)
+
         # Export of table that is exported
         conn2 = open(self.output_path + "/table_final.csv", "w", encoding="UTF-8")
         conn2.write(
@@ -309,38 +382,16 @@ class MergeTables:
                 line = line[:5] + mid_list + line[5:]
                 conn2.write(",".join([str(i) for i in line]) + "\n")
         conn2.close()
-        rewrite_c = dict()
+
+        self.set_plotting_object(limit_mass=limit_mass, manual_index=None, plot_images=plot_pictures)
+
         simple_plot_set = set()
-        plotting_obj = None
-        plotting_obj_project_name = None
-        for index2, i in enumerate(self.experiment_object_list):
-            if type(i) != dict:
-                # Searching for python object to get to plot pictures
-                plotting_obj = i
-                plotting_obj_project_name = self.folder_list[index2]
-                break
-        if plot_pictures:
-            if not self.group_names:
-                raise Exception("You have to group files in order to get pictures!!!")
-            if len(self.group_names) > 10:
-                pallete = plt.cm.tab20
-            else:
-                pallete = plt.cm.tab10
-            colors = iter([pallete(i) for i in range(len(self.group_names))])
-            d_1 = dict()
-            for group in self.group_names:
-                d_1[group] = next(colors)
-            for name in self.names_list:
-                for key, value in d_1.items():
-                    if key in name:
-                        if "blank" in name.lower():
-                            linestyle = "dashed"
-                        else:
-                            linestyle = "solid"
-                        rewrite_c[name] = (linestyle, value)
-                        break
-                else:
-                    raise Exception(f"No group for {name}")
+
+        self.precalculate_plot_colors(plot_pictures=plot_pictures)
+        dep.output_path = self.output_path
+        if not os.path.isdir(dep.output_path + "/feature_pictures/"):
+            os.mkdir(dep.output_path + "/feature_pictures/")
+
         previous_index = None
         export_object = Export_ms(100)
         previous_name = ""
@@ -349,22 +400,17 @@ class MergeTables:
         for zz, feature in enumerate(self.table):
             bar.update(zz)
             current_index = feature[0]
-            if plot_pictures and (feature[0] not in simple_plot_set) and (
-                    len(index_list) == 0 or current_index in index_list):
-                # See if this wor should be plotted or not
-                simple_plot_set.add(feature[0])
-                dep.output_path = self.output_path
-                if not os.path.isdir(dep.output_path + "/feature_pictures/"):
-                    os.mkdir(dep.output_path + "/feature_pictures/")
-                plotting_obj.extract_sim(
-                    feature[1], filename=self.names_list, mz_tolerance=0.05,
-                    retention_time_range=(round(feature[2] - 0.5, 1), round(feature[2] + 0.5, 1)),
-                    save_graph=f"/feature_pictures/{current_index}_{feature[1]:.3f}_{feature[2]:.1f}",
-                    rewrite_colors=rewrite_c)
 
             if index_list and (current_index not in index_list):
                 # If current index is not in index list and index list is present then we should skip
                 continue
+
+            if plot_pictures and (feature[0] not in simple_plot_set) and (
+                    len(index_list) == 0 or current_index in index_list):
+                # See if this wor should be plotted or not
+                simple_plot_set.add(feature[0])
+                self.plot_sim(current_index, feature[1], feature[2])
+
             if current_index != previous_index:
                 export_object.export_files(previous_name, export_folder)
                 export_object = Export_ms(100)
@@ -390,13 +436,11 @@ class MergeTables:
             else:  # Project from python
                 if plot_pictures:
                     dep.output_path = self.output_path
-                    curr_object.plot_from_index(feature[4], save_graph=True, graph_path_folder="feature_pictures_t/",
-                                                show_plot=False, save_name_with_tuple_index=False)
-                    plt.close('all')
+                    self.plot_python_peak_report_graph(feature[4], new_index=feature[0])
                 peak_data_line = curr_object.aligned_dict["peak_data"][
                     curr_object.aligned_dict["peak_data"]["index"] == feature[4]]
                 if len(peak_data_line) != 1:
-                    raise Exception("Problem with table!!")
+                    raise Exception("Problem with the table!!")
 
                 scan_index_list = [[i, i.split("__")[0]] for i in peak_data_line["scans"][0].split("|") if
                                    i.count("__") == 1]
@@ -420,8 +464,8 @@ class MergeTables:
             previous_index = current_index
 
         export_object.export_files(previous_name, export_folder)
-        if plot_pictures:
-            self.rename_pictures_names(plotting_obj_project_name)
+        # if plot_pictures:
+        #     self.rename_pictures_names(self.plotting_obj_project_name)
 
     def export_averaged_table(self, check_if_same=False):
         export_path = self.output_path
@@ -704,7 +748,10 @@ def extract_msms_from_vip_features(recover_object_path, interesting_indexes=tupl
             interesting_indexes = obj.read_simca_output(file_vip_simca, min_VIP, max_features, file_s_simca, limit_mass)
         else:
             df = obj.get_VIP(True, True, Y=manual_pls_labels)
-            df = df[df['VIP']> min_VIP]
+            df["V2"] = 0
+            df['name'] = df['index'].apply(str) + "_mz=" + df["mz"].apply(round, args=(3,)).apply(str)
+            # obj.table_VIP = df[['name', 'VIP', 'V2']]
+            df = df[df['VIP'] > min_VIP]
             v1 = df["index"].values.tolist()
             interesting_indexes = [int(i) for i in v1][:max_features]
     obj.export_ms(interesting_indexes, limit_mass=limit_mass)
