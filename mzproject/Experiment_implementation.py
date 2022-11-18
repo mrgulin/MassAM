@@ -58,7 +58,7 @@ def run_python_experiments(suffix, QC_features, comment_additional, number_of_fi
                     "QC_features":QC_features, "comment": comment_list[i], "file_group_list":file_group_list_list[i]}
         keywords.update(kwargs)
         print(keywords)
-        p = Process(target=experiment.run_one_experiment, args=(files_list[i],), kwargs=keywords)
+        p = Process(target=experiment.run_experiment_python, args=(files_list[i],), kwargs=keywords)
         p.start()
         process_list.append(p)
 
@@ -116,7 +116,7 @@ def run_MZmine_experiments(suffix, QC_features, comment_additional, number_of_fi
 
     process_list = []
     for i in number_of_files:
-        p = Process(target=experiment.run_one_experiment_mzmine,
+        p = Process(target=experiment.run_experiment_mzmine,
                     args=(names_list[i], "Experiment/neg2/", files_list[i], file_group_list_list[i], QC_features, "neg",
                           comment_list[i]), kwargs={"protocol":protocol, "change_dict":change_dict})
         p.start()
@@ -125,7 +125,7 @@ def run_MZmine_experiments(suffix, QC_features, comment_additional, number_of_fi
     for p in process_list:
         p.join()
     """for i in range(number_of_files):
-        experiment.run_one_experiment_mzmine(names_list[i], "Experiment/neg2/", files_list[i], file_group_list_list[i],
+        experiment.run_experiment_mzmine(names_list[i], "Experiment/neg2/", files_list[i], file_group_list_list[i],
                                              QC_features, "neg", comment_list[i], protocol=protocol,
                                              change_dict=change_dict)"""
 # use of these functions went to Workbooks/parameter_opt.py

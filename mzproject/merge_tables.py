@@ -176,7 +176,7 @@ class MergeTables:
                     conn = open(self.output_path + file + "/table-h.csv", "r")
                     text = conn.readlines()
                     conn.close()
-                except:
+                except FileNotFoundError:
                     print(self.output_path + file + "/table-h.csv")
                     raise Exception("Problem with names of tables (no quant_table.csv of table-h.csv)")
                 header = text[0].strip().split(",")

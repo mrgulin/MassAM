@@ -147,10 +147,11 @@ def _compare_table_with_qc(peak_data_table, rel_path, python, h_table, A_table, 
     conn.close()
 
 
-def run_one_experiment(file_list, name="test1", polarity="neg", input_path=None, subdirectory="test",
-                       change_dict=tuple(), qc_features: Union[tuple, np.array] = tuple(),
-                       from_table=False, comment="", compare_with_qc=False, file_group_list=("MIX2", "MIX1", "Blank"),
-                       save_peak_graphs=True, limit_mz=tuple(), ratio_mz_tr=50):
+def run_experiment_python(file_list, name="test1", polarity="neg", input_path=None, subdirectory="test",
+                          change_dict=tuple(), qc_features: Union[tuple, np.array] = tuple(),
+                          from_table=False, comment="", compare_with_qc=False,
+                          file_group_list=("MIX2", "MIX1", "Blank"),save_peak_graphs=True, limit_mz=tuple(),
+                          ratio_mz_tr=50):
     # Measuring time at start
     start_time = time.perf_counter()
     current_time = datetime.now().strftime("%H:%M:%S")
@@ -230,9 +231,9 @@ def get_MSMS_number(path_to_file, reduce_file=True):
     return id_dict
 
 
-def run_one_experiment_mzmine(name, subdirectory, file_list, file_group_list, qc_features, polarity="neg", comment="",
-                              protocol="MSMS_peaklist_builder", change_dict=None, calculate_table=True,
-                              reduce_file=True, save_project="", ratio_mz_tr=50):
+def run_experiment_mzmine(name, subdirectory, file_list, file_group_list, qc_features, polarity="neg", comment="",
+                          protocol="MSMS_peaklist_builder", change_dict=None, calculate_table=True,
+                          reduce_file=True, save_project="", ratio_mz_tr=50):
     if change_dict is None:
         change_dict = dict()
     out1 = [name, polarity, comment, file_list, file_group_list]
@@ -435,9 +436,9 @@ if __name__ == "__main__":
     np.seterr(all='raise')
     qc_features1, f_list_neg1, f_list_pos1 = get_files_qc_features()
 
-    run_one_experiment([i for i in f_list_neg1 if "QC_MIX" in i], 'test_python', 'neg', subdirectory='test_python',
-                       qc_features=qc_features1, compare_with_qc=True, limit_mz=(200, 250), )
-    # run_one_experiment_mzmine('mzmine_test', 'test_python', [i for i in f_list_neg1 if "QC_MIX" in i],
+    run_experiment_python([i for i in f_list_neg1 if "QC_MIX" in i], 'test_python', 'neg', subdirectory='test_python',
+                          qc_features=qc_features1, compare_with_qc=True, limit_mz=(200, 250), )
+    # run_experiment_mzmine('mzmine_test', 'test_python', [i for i in f_list_neg1 if "QC_MIX" in i],
     #                           ['MIX1', "MIX2"], qc_features1)
 
     # table_of_paths = ["Experiment/neg/EtOH_QC", "Experiment/neg/Beer_QC", "Experiment/neg/WW_QC",
