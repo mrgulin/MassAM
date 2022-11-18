@@ -200,92 +200,6 @@ class MzProject:
         :param mz_tr_tuple: tuple in form of ((mz1, tr1, ANYTHING), ...)
         :param self:
         :param filename_list: list of strings (e.g. output from f.get_files)
-        :param limit_mass: (min_mz, max_mz), else there is no limit
-        """
-        old_filename = []
-        if self.filename:
-            old_filename = self.filename
-            self.filename = []
-        first = True
-        self.logger.log(20, f'| Starting to add {len(filename_list)} files')
-        # It reads data trough mzxml.read and it transforms it into dataframe
-        file_counter = 0
-        for filename in filename_list:  # TODO: parallelize
-            self.filename.append(filename)
-            scans = []
-            self.peaks[filename] = dict()
-            self.logger.log(18, "|| Reading ", dep.input_path + filename, f" ({file_counter}/{len(filename_list)})")
-            file_counter += 1
-            with mzxml.read(dep.input_path + filename) as reader:
-
-                for item in reader:
-
-                    if "collisionEnergy" in item:  # This is a MS2 spectrum
-                        precursor_scan_num = item['precursorMz'][0]['precursorScanNum']
-                        precursor_intensity = item['precursorMz'][0]['precursorIntensity']
-                        activation_method = item['precursorMz'][0]['activationMethod']
-                        precursor_mz = item['precursorMz'][0]['precursorMz']
-                        temp_energy = item['collisionEnergy']
-                    else:
-                        temp_energy = activation_method = precursor_scan_num = np.nan
-                        precursor_mz = precursor_intensity = np.nan
-
-                    peak_dict_name = filename + "__" + item['index']
-
-                    if mz_tr_tuple and not np.isnan(precursor_mz):
-                        close = False
-                        for line2 in mz_tr_tuple:
-                            mz_j = line2[0]
-                            tr_j = line2[1]
-                            if abs(mz_j - precursor_mz) < 0.5 and abs(item['retentionTime'] - tr_j) < 1:
-                                close = True
-                        if not close:
-                            continue
-
-                    if limit_mass and not np.isnan(precursor_mz):
-                        if not (limit_mass[0] < precursor_mz < limit_mass[1]):
-                            continue
-
-                    row = (
-                        peak_dict_name, filename + "__" + item['num'], item['msLevel'], item['peaksCount'],
-                        item['retentionTime'], item.get('lowMz'), item.get('highMz'),
-                        item['basePeakMz'], item['basePeakIntensity'], item['totIonCurrent'],
-                        temp_energy, activation_method, precursor_scan_num, precursor_mz, precursor_intensity)
-                    scans.append(row)
-                    i = item['intensity array']
-                    m = item['m/z array']
-                    if len(i) == 0:
-                        i = [0]
-                        m = [-1]
-
-                    self.peaks[filename][peak_dict_name] = np.array([m, i]).transpose()
-                scans_df = pd.DataFrame(scans, columns=['index', 'num', 'msLevel', 'peaksCount', 'retentionTime',
-                                                        'lowMz', 'highMz', 'basePeakMz', 'basePeakIntensity',
-                                                        'totIonCurrent', 'tempenergy', 'activationMethod',
-                                                        'precursorScanNum', 'precursorMz', 'precursorIntensity'])
-                scans_df.set_index('index', inplace=True)
-                scans_df["filename"] = filename
-
-                if first:
-                    self.scans = scans_df  # data about scans
-                    first = False
-                else:
-                    self.scans = self.scans.append(scans_df)
-        self.scans2 = self.scans[self.scans.msLevel == 2].copy()
-        self.scans2.loc[:, "keep"] = True
-        self.scans2.reindex(copy=False)
-        if old_filename and old_filename != self.filename:
-            str1 = "Problem! Files that are read are not same as those that were in imported aligned_dict!"
-            str1 += f"files from aligned_dict: {old_filename}\n imported files: {self.filename}"
-            self.logger.log(40, "|| " + str1)
-        self.logger.log(18, "|| files read")
-
-    def add_files_speed(self, filename_list: list, mz_tr_tuple: tuple = (), limit_mass=tuple()):
-        """
-        This method takes filename_list and generates scans dataframe, peaks dictionary, filename list, ...
-        :param mz_tr_tuple: tuple in form of ((mz1, tr1, ANYTHING), ...)
-        :param self:
-        :param filename_list: list of strings (e.g. output from f.get_files)
         :param limit_mass: (min_mz, max_mz); if left there is no limit
         """
         self.logger.log(20,
@@ -374,6 +288,8 @@ class MzProject:
             str1 += f"files from aligned_dict: {old_filename}\n imported files: {self.filename}"
             self.logger.log(40, "|| " + str1)
         self.logger.log(18, "|| files read")
+
+    add_files_speed = add_files
 
     def add_aligned_dict(self, source_folder: str, root_name: str, extension_list=tuple(), sep: str = ",",
                          common_columns: int = 10):
