@@ -1,8 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import mzproject.dependencies as dep
 import pandas as pd
-from pyteomics import mzxml
+# from pyteomics import mzxml
 import os
 from lxml import etree as etree_lxml
 import base64
@@ -11,10 +10,11 @@ from scipy.signal import savgol_filter
 from numpy.lib.recfunctions import structured_to_unstructured
 from sklearn.cluster import AgglomerativeClustering
 import typing
-import numba
 import warnings
 from dataclasses import dataclass, field
-import mzproject.logger_file
+
+from .. import dependencies as dep
+from . import logger_file
 
 m_p = 1.00727647  # Da, g/mol, amu
 np.seterr(all='raise')
@@ -142,10 +142,10 @@ class SplitFeatureDataClass:
 
 class MzProject:
     def __init__(self, stream_level=25, file_level=20):
-        self.logger = mzproject.logger_file.general_logger  # Generate logger for the class
-        mzproject.logger_file.logging.captureWarnings(True)
-        mzproject.logger_file.stream_handler.setLevel(stream_level)
-        mzproject.logger_file.general_handler.setLevel(file_level)
+        self.logger = logger_file.general_logger  # Generate logger for the class
+        logger_file.logging.captureWarnings(True)
+        logger_file.stream_handler.setLevel(stream_level)
+        logger_file.general_handler.setLevel(file_level)
 
         self.logger.log(20, f"Initializing object for feature table generation.")
         # this is with pytheomics
@@ -1834,7 +1834,7 @@ def find_peak_function(y, threshold, descending_threshold=0.95):
                 # this first minimum or we are ascending or it is the smallest minimum
                 previous_minimum = row
     peak_list.append([peak_start, (previous_minimum[1], previous_minimum[2])])
-    mzproject.logger_file.general_logger.log(10, f'||||| Obtained peak list: {peak_list}')
+    logger_file.general_logger.log(10, f'||||| Obtained peak list: {peak_list}')
     return peak_list
 
 

@@ -1,33 +1,28 @@
-import mzproject.class_file
-import mzproject.dependencies as dep
-import mzproject.functions
 import numpy as np
 import time
 import os
 from datetime import datetime
-import mzproject.functions as f
-import mzproject.paths as paths
 from subprocess import Popen, CREATE_NEW_CONSOLE
 from typing import Union
+from .. import functions as f
+from .. import paths as paths
+from .. import dependencies as dep
+from . import class_file
 
 types = [("d_tr", np.float64), ("d_mz", np.float64), ("n_MSMS", int), ("n", int), ("h", np.float64)]
 
 
-def get_files_qc_features():
-    f_list_neg = mzproject.functions.get_files()
-    f_list_pos = mzproject.functions.get_files(paths.input_path_pos)
-    f_list_pos = [i for i in f_list_pos if ("QC_MIX" in i) or ("Blank_EtOH" in i)]
-
+def read_qc_features(path, force_adduct_mz_calculaton=False):
     types_qc = [("name", "<U20"), ("mz", np.float64), ("tr", np.float64), ("adduct", "<U20"), ("mode", "<U5"),
                 ("mz_ion", np.float64)]
     qc_features = f.read_simple_file_list(paths.IJS_ofline_path + "QC/QC_compounds_final.csv", header=False,
                                           encoding="UTF-8-sig")
     qc_features = np.array([tuple(i) for i in qc_features], dtype=types_qc)
-
-    for compound in qc_features:
-        compound["mz_ion"] = compound["mz"] + {**dep.delta_mass_neg_adducts, **dep.delta_mass_pos_adducts}[
-            compound["adduct"]]
-    return qc_features, f_list_neg, f_list_pos
+    if sum(qc_features['mz_ion']) == 0 or force_adduct_mz_calculaton:
+        for compound in qc_features:
+            compound["mz_ion"] = compound["mz"] + {**dep.delta_mass_neg_adducts, **dep.delta_mass_pos_adducts}[
+                compound["adduct"]]
+    return qc_features
 
 
 def _compare_table_with_qc(peak_data_table, rel_path, python, h_table, A_table, mzproject_obj, qc_features, comment,
@@ -163,7 +158,7 @@ def run_experiment_python(file_list, name="test1", polarity="neg", input_path=No
     if not os.path.isdir(dep.IJS_ofline_path + f"/{subdirectory}/{name}"):
         os.mkdir(dep.IJS_ofline_path + f"/{subdirectory}/{name}")
     dep.change_output(dep.IJS_ofline_path + f"/{subdirectory}/{name}/")
-    obj = mzproject.class_file.MzProject()
+    obj = class_file.MzProject()
 
     for key, value in change_dict:
         obj.parameters[key] = value

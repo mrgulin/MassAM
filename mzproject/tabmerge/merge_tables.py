@@ -1,8 +1,7 @@
-import os
-import mzproject.paths as paths
-import mzproject.dependencies as dep
-import mzproject.class_file
-import mzproject.functions as f
+from .. import paths
+from .. import dependencies as dep
+from ..featgen import class_file
+from .. import functions as f
 import progressbar
 import time
 import matplotlib.pyplot as plt
@@ -282,7 +281,7 @@ class MergeTables:
             if self.experiment_object_list[index]:  # MZmine
                 self.experiment_object_list[index] = read_mgf(folder + "/MS2_spectra.mgf")
             else:
-                obj = mzproject.class_file.MzProject()
+                obj = class_file.MzProject()
                 conn = open(folder + "/Experiment_info.txt")
                 data = eval(conn.read())
                 conn.close()
@@ -340,7 +339,7 @@ class MergeTables:
         if self.rewrite_c is None:
             print("There is no color palette yet so I am creating one with default arguments!")
             self.precalculate_plot_colors()
-        self.plotting_obj: mzproject.class_file.MzProject
+        self.plotting_obj: class_file.MzProject
         self.plotting_obj.extract_sim(
             mz, filename=self.names_list, mz_tolerance=0.05,
             retention_time_range=(round(tr - 0.5, 1), round(tr + 0.5, 1)),

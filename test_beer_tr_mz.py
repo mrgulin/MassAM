@@ -1,6 +1,4 @@
-import mzproject.class_file
 import mzproject.functions as f
-import numpy as np
 
 files = f.get_files(list_key='beer')
 # obj = mzproject.class_file.mzproject('Negative')

@@ -1,6 +1,6 @@
 from os import listdir
 import numpy as np
-import mzproject.dependencies as dep
+from . import dependencies as dep
 
 
 def get_files(folder_path=dep.input_path, list_key: str = "", limit: int = 0) -> list:

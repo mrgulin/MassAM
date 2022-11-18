@@ -4,7 +4,7 @@ import logging
 # depending on the importance
 formatter = logging.Formatter('%(levelname)8s %(lineno)4s %(asctime)s: %(message)s', "%Y-%m-%d %H:%M:%S")
 # To include file name: %(filename)s || %(module)s  || %(funcName)s
-general_handler = logging.FileHandler('logger.log', mode='w')
+general_handler = logging.FileHandler('../logger.log', mode='w')
 general_handler.setFormatter(formatter)
 general_handler.setLevel(20)  # <- sets amount that is printed in the log file
 

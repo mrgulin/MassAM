@@ -1,14 +1,12 @@
-
-import os.path
-
-import Workbooks.Simulant_experiment
-from MzProject import experiment
+import numpy as np
+import mzproject.paths as paths
+from mzproject.featgen import experiment
 import mzproject.functions as f
-import mzproject.merge_tables
-QC_features, f_list_neg, f_list_pos = experiment.get_files_QC_features()
-file_list = f.get_files(list_key="beer_simulant")
 
-mzproject.merge_tables.do_all(r"C:/Users/tinc9/Documents/IJS-offline/Experiment/simulant_neg_low_mz/", file_list,
-              ["python_beer_simulant_neg_lowmz"], "neg", True,
-              tuple(), "Experiment/simca_results/simca_simulant_neg_lowmz",
-                           "General-List_VIP_opls-da_mzLow.txt", "General-List_s-plot_opls-da_mzLow.txt")
+f_list_neg1 = f.get_files()
+
+qc_features1 = experiment.read_qc_features(r"C:\Users\tinc9\Documents\IJS-offline\QC\QC_compounds_final.csv")
+
+experiment.run_experiment_python([i for i in f_list_neg1 if "QC_MIX" in i], 'test_python', 'neg',
+                                 subdirectory='test_python', qc_features=qc_features1, compare_with_qc=True,
+                                 limit_mz=(200, 250))

@@ -1,9 +1,9 @@
-import mzproject.paths
+from .import paths
 import numpy as np
 
-input_path = mzproject.paths.input_path
-output_path = mzproject.paths.output_path
-IJS_ofline_path = mzproject.paths.IJS_ofline_path
+input_path = paths.input_path
+output_path = paths.output_path
+IJS_ofline_path = paths.IJS_ofline_path
 silent = True
 
 
