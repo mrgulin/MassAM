@@ -63,7 +63,7 @@ def read_mgf(path):
     return data_dict
 
 
-class Export_ms:
+class ExportMS:
     def __init__(self, split_on=100):
         self.expstring = [""]
         self.split_on = split_on
@@ -392,7 +392,7 @@ class MergeTables:
             os.mkdir(dep.output_path + "/feature_pictures/")
 
         previous_index = None
-        export_object = Export_ms(100)
+        export_object = ExportMS(100)
         previous_name = ""
         bar = progressbar.ProgressBar(max_value=len(self.table))
         bar.update(0)
@@ -412,7 +412,7 @@ class MergeTables:
 
             if current_index != previous_index:
                 export_object.export_files(previous_name, export_folder)
-                export_object = Export_ms(100)
+                export_object = ExportMS(100)
 
             file_index = self.folder_list.index(feature[3])
             curr_object = self.experiment_object_list[file_index]
