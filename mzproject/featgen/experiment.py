@@ -163,15 +163,19 @@ def run_experiment_python(file_list, name="test1", polarity="neg", input_path=No
     for key, value in change_dict:
         obj.parameters[key] = value
 
-    obj.add_files_speed(file_list, limit_mass=limit_mz)
+    obj.add_files_speed(file_list, limit_mass=limit_mz, calculate_mean=True, regex_dict=None)
     if not from_table:
         obj.filter_constant_ions(save_graph="deleted_masses.png")
         obj.merge_features()
         obj.generate_table(save_graph=False, force=True, )
         obj.merge_duplicate_rows()
-        obj.calculate_mean()
         obj.export_tables("table")
-        obj.export_tables_averaged("table_averaged")
+        if calculate_mean:
+            if regex_dict is None:
+                raise ValueError("If mean is to be calculated then you have to supply regex dict (looks like: "
+                                 "{'MIX1': ('QC_MIX1_.*', ), 'MIX2': ('QC_MIX2_.*', )}")
+            obj.calculate_mean(regex_dict)
+            obj.export_tables_averaged("table_averaged")
     else:
         obj.add_aligned_dict(dep.IJS_ofline_path + f"/{subdirectory}/{name}/", "table")
 

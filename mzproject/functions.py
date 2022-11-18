@@ -1,5 +1,7 @@
 from os import listdir
 import numpy as np
+import re
+
 from . import dependencies as dep
 
 
@@ -151,6 +153,22 @@ def get_unwanted_masses(path="../sirius_import/deleted_masses.txt", skip=0):
     conn.close()
     print(text[:skip])
     return masses
+
+
+def generate_name_index_dict_regex(list_names, regex_dict, offset_indices=0):
+    group_dict = dict()
+    for i, name in enumerate(list_names):
+        for rd_key, rd_val in regex_dict.items():
+            if sum([int(bool(re.search(re_pattern, name))) for re_pattern in rd_val]) > 0:
+                cut_curr_name = rd_key
+                break
+        else:
+            raise KeyError(f"There is no group for: {name}")
+        if cut_curr_name in group_dict:
+            group_dict[cut_curr_name].append(i + offset_indices)
+        else:
+            group_dict[cut_curr_name] = [i + offset_indices]
+    return group_dict
 
 
 if __name__ == "__main__":

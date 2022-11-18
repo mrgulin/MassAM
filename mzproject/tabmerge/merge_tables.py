@@ -466,31 +466,10 @@ class MergeTables:
         # if plot_pictures:
         #     self.rename_pictures_names(self.plotting_obj_project_name)
 
-    def export_averaged_table(self, check_if_same=False):
+    def export_averaged_table(self, regex_dict, check_if_same=False):
         export_path = self.output_path
         n_non_h_cols = 5
-        group_dict = dict()
-        if ".xml" in self.names_list[0]:
-            common_suffix_length = 8
-        else:
-            common_suffix_length = 7
-
-        for i in range(len(self.names_list)):
-            curr_name = self.names_list[i].replace(" ", "")[:-common_suffix_length]
-            split_curr_name = curr_name.split("_")
-            cut_curr_name = "_".join(split_curr_name[:-1])
-            if len(split_curr_name) == 1:
-                group_dict[curr_name] = [i]
-                continue
-            elif "-" in split_curr_name[-1]:
-                cut_curr_name = curr_name
-            elif len(split_curr_name[-1]) == 2:
-                cut_curr_name += "_3"
-            if cut_curr_name in group_dict:
-                group_dict[cut_curr_name].append(i + n_non_h_cols)
-            else:
-                group_dict[cut_curr_name] = [i + n_non_h_cols]
-        print(group_dict)
+        group_dict = f.generate_name_index_dict_regex(self.names_list, regex_dict, offset_indices=n_non_h_cols)
         group_list = list(group_dict.keys())
         averaged_table = []
         for index, val in enumerate(self.table):
@@ -702,7 +681,7 @@ def vip(x, y, model):
     return vips
 
 
-def generate_ensemble_list(folder_project, file_list, project_list, polarity):
+def generate_ensemble_list(folder_project, file_list, project_list, polarity, regex_dict):
     """
     This function gets folder of a project and information about projects and returns ensemble table that
     merges all methods that generate feature lists as well as 2d table that is suitable as simca input.
@@ -716,7 +695,7 @@ def generate_ensemble_list(folder_project, file_list, project_list, polarity):
     obj = MergeTables(project_list, file_list, polarity, folder_project)
     obj.generate_table()
     obj.add_new_indexes()
-    obj.export_averaged_table()
+    obj.export_averaged_table(regex_dict)
     obj.export_filtered_table()
     obj.export_simca(",")
     obj.save_object()
@@ -755,18 +734,3 @@ def extract_msms_from_vip_features(recover_object_path, interesting_indexes=tupl
             interesting_indexes = [int(i) for i in v1][:max_features]
     obj.export_ms(interesting_indexes, limit_mass=limit_mass)
     return obj
-
-
-if __name__ == "__main__":
-    # mzproject.merge_tables.do_all(r"C:/Users/tinc9/Documents/IJS-offline/Experiment/simulant_neg_low_mz/", file_list,
-    #                               ["python_beer_simulant_neg_lowmz"], "neg", True,
-    #                               tuple(), "Experiment/simca_results/simca_simulant_neg_lowmz",
-    #                               "General-List_VIP_opls-da_mzLow.txt", "General-List_s-plot_opls-da_mzLow.txt")
-    files = f.get_files()
-    # obj1 = generate_ensemble_list(r"C:/Users/tinc9/Documents/IJS-offline/test_python/", [i for i in files if "QC_MIX" in i],
-    #                         ['test_python', 'mzmine_test'], "neg")
-    # obj2 = import_merge_tables_object(r"C:/Users/tinc9/Documents/IJS-offline/test_python/")
-
-    obj3 = extract_msms_from_vip_features(r"C:/Users/tinc9/Documents/IJS-offline/test_python/",
-                                          interesting_indexes=tuple(), manual_pls_labels=[0, 0, 0, 1, 1, 1],
-                                          limit_mass=(200, 250), max_features=20)

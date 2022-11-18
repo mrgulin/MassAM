@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from .. import dependencies as dep
 from . import logger_file
+from .. import functions as f
 
 m_p = 1.00727647  # Da, g/mol, amu
 np.seterr(all='raise')
@@ -908,7 +909,7 @@ class MzProject:
         self.matched_list = match_list
         return match_list
 
-    def calculate_mean(self, suffix_length=7, dtype=float):
+    def calculate_mean(self, regex_dict, suffix_length=7, dtype=float):
         """
         Algorithm averages sample parallels from aligned dict. If there are 3 samples than at least 2 must have non 0
         integral. If there is only 1 or 2 samples, "all" concentration must be non-zero.
@@ -916,22 +917,7 @@ class MzProject:
         :param suffix_length: number of character that is common to all sample name (7 for _negxml and 8 for _neg.xml)
         :param dtype: type of characters in table because aligned table can be type str
         """
-        group_dict = dict()
-        for i in range(len(self.filename)):
-            curr_name = self.filename[i].replace(" ", "")[:-suffix_length]
-            split_curr_name = curr_name.split("_")
-            cut_curr_name = "_".join(split_curr_name[:-1])
-            if len(split_curr_name) == 1:
-                group_dict[curr_name] = [i]
-                continue
-            elif "-" in split_curr_name[-1]:
-                cut_curr_name = curr_name
-            elif len(split_curr_name[-1]) == 2:
-                cut_curr_name += "_3"
-            if cut_curr_name in group_dict:
-                group_dict[cut_curr_name].append(i)
-            else:
-                group_dict[cut_curr_name] = [i]
+        group_dict = f.generate_name_index_dict_regex(self.filename, regex_dict, 0)
         self.logger.log(20, f"| Calculate mean: group dict={group_dict}")
         for gr_name in group_dict.keys():
             self.header_averaged.append(gr_name)
